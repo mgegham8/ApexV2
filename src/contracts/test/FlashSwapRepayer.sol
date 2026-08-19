@@ -1,71 +1,149 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity 0.8.28;
 
-interface IApexV2Callee {
-    function ApexV2Call(
+interface IApexFlashRepayCallee {
+    function apexV2Call(
         address sender,
-        uint amount0,
-        uint amount1,
+        uint256 amount0,
+        uint256 amount1,
         bytes calldata data
-    ) external;
+    )
+        external;
 }
 
-interface IApexV2Pair {
+interface IApexFlashRepayPair {
     function swap(
-        uint amount0Out,
-        uint amount1Out,
+        uint256 amount0Out,
+        uint256 amount1Out,
         address to,
         bytes calldata data
-    ) external;
+    )
+        external;
+
+    function token0()
+        external
+        view
+        returns (address);
+
+    function token1()
+        external
+        view
+        returns (address);
 }
 
-interface IERC20 {
+interface IApexFlashRepayToken {
     function transfer(
         address to,
-        uint amount
-    ) external returns(bool);
+        uint256 amount
+    )
+        external
+        returns (bool);
 }
 
-interface IERC20Info {
-    function token0() external view returns(address);
-    function token1() external view returns(address);
-}
+contract FlashSwapRepayer is IApexFlashRepayCallee {
+    error InvalidPair();
+    error TransferFailed();
 
-contract FlashSwapRepayer is IApexV2Callee {
+    address public activePair;
 
     function execute(
         address pair,
-        uint amount0,
-        uint amount1
-    ) external {
-        IApexV2Pair(pair).swap(
+        uint256 amount0,
+        uint256 amount1
+    )
+        external
+    {
+        activePair =
+            pair;
+
+        IApexFlashRepayPair(pair).swap(
             amount0,
             amount1,
             address(this),
             abi.encode(pair)
         );
+
+        activePair =
+            address(0);
     }
 
-    function ApexV2Call(
+    function apexV2Call(
         address,
-        uint amount0,
-        uint amount1,
+        uint256 amount0,
+        uint256 amount1,
         bytes calldata data
-    ) external {
-        address pair = abi.decode(data, (address));
-        address token0 = IERC20Info(pair).token0();
-        address token1 = IERC20Info(pair).token1();
+    )
+        external
+        override
+    {
+        address pair =
+            abi.decode(
+                data,
+                (address)
+            );
 
-        // Ճիշտ բանաձև՝ գումարը + 0.3% վճար
-        uint repay0 = amount0 == 0 ? 0 : (amount0 * 1000) / 997 + 1;
-        uint repay1 = amount1 == 0 ? 0 : (amount1 * 1000) / 997 + 1;
-
-        if(amount0 > 0) {
-            IERC20(token0).transfer(pair, repay0);
+        if (
+            msg.sender != pair ||
+            pair != activePair
+        ) {
+            revert InvalidPair();
         }
 
-        if(amount1 > 0) {
-            IERC20(token1).transfer(pair, repay1);
+        address token0 =
+            IApexFlashRepayPair(pair)
+                .token0();
+
+        address token1 =
+            IApexFlashRepayPair(pair)
+                .token1();
+
+        /*
+         * Same-token flash repayment:
+         *
+         * amountIn * 997 >= amountOut * 1000
+         *
+         * ceil(amountOut * 1000 / 997)
+         */
+        uint256 repay0 =
+            amount0 == 0
+                ? 0
+                : (
+                    amount0 * 1000 +
+                    996
+                ) / 997;
+
+        uint256 repay1 =
+            amount1 == 0
+                ? 0
+                : (
+                    amount1 * 1000 +
+                    996
+                ) / 997;
+
+        if (repay0 != 0) {
+            bool success0 =
+                IApexFlashRepayToken(token0)
+                    .transfer(
+                        pair,
+                        repay0
+                    );
+
+            if (!success0) {
+                revert TransferFailed();
+            }
+        }
+
+        if (repay1 != 0) {
+            bool success1 =
+                IApexFlashRepayToken(token1)
+                    .transfer(
+                        pair,
+                        repay1
+                    );
+
+            if (!success1) {
+                revert TransferFailed();
+            }
         }
     }
 }

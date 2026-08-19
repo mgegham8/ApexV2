@@ -1,78 +1,49 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
-
+pragma solidity 0.8.28;
 
 library ApexMath {
-
-
-    /**
-     * @notice Returns the smaller value
-     */
     function min(
         uint256 x,
         uint256 y
     )
         internal
         pure
-        returns(uint256 z)
+        returns (uint256)
     {
-
-        z =
-            x < y
-            ?
-            x
-            :
-            y;
-
+        return x < y
+            ? x
+            : y;
     }
 
-
-
-
-
-    /**
-     * @notice Calculates integer square root
-     * @dev Babylonian method
-     */
     function sqrt(
         uint256 y
     )
         internal
         pure
-        returns(uint256 z)
+        returns (uint256 z)
     {
-
-
-        if(y > 3)
-        {
-
-            z = y;
-
-
-            uint256 x =
-                y / 2 + 1;
-
-
-
-            while(x < z)
-            {
-
-                z = x;
-
-
-                x =
-                    (y / x + x) / 2;
-
-            }
-
-        }
-        else if(y != 0)
-        {
-
-            z = 1;
-
+        if (y == 0) {
+            return 0;
         }
 
+        if (y <= 3) {
+            return 1;
+        }
+
+        z = y;
+
+        uint256 x =
+            (y / 2) + 1;
+
+        while (x < z) {
+            z = x;
+
+            x =
+                (
+                    y / x +
+                    x
+                ) /
+                2;
+        }
     }
-
 }

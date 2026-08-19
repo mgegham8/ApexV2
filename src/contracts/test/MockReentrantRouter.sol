@@ -1,122 +1,127 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity 0.8.28;
 
-
-interface IController {
-
+interface IApexReentrantController {
     function launch(
         address weth,
-        uint tokenAmount,
-        uint ethAmount
+        uint256 tokenAmount,
+        uint256 ethAmount
     )
-    external
-    payable;
-
+        external
+        payable;
 }
 
-
-
 contract MockReentrantRouter {
-
+    error ControllerAlreadySet();
+    error ZeroController();
+    error InsufficientETH();
 
     address public controller;
 
-
     address public weth;
 
-
-    uint public tokenAmount;
-
-
-    uint public ethAmount;
-
-
+    uint256 public tokenAmount;
+    uint256 public ethAmount;
 
     bool public attack;
 
+    // ============================================================
+    // SETUP
+    // ============================================================
 
-
-    constructor(
+    function setController(
         address _controller
     )
+        external
     {
-        controller = _controller;
+        if (_controller == address(0)) {
+            revert ZeroController();
+        }
+
+        if (controller != address(0)) {
+            revert ControllerAlreadySet();
+        }
+
+        controller =
+            _controller;
     }
-
-
-
-
 
     function setAttack(
         address _weth,
-        uint _tokenAmount,
-        uint _ethAmount
+        uint256 _tokenAmount,
+        uint256 _ethAmount
     )
-    external
+        external
     {
+        weth =
+            _weth;
 
-        weth = _weth;
+        tokenAmount =
+            _tokenAmount;
 
-        tokenAmount = _tokenAmount;
+        ethAmount =
+            _ethAmount;
 
-        ethAmount = _ethAmount;
-
-        attack = true;
-
+        attack =
+            true;
     }
 
+    // ============================================================
+    // MOCK ROUTER
+    // ============================================================
 
-
-
-
-
-
-    function addLiquidity(
+    function addLiquidityETH(
         address,
+        uint256 amountTokenDesired,
+        uint256,
+        uint256,
         address,
-        uint,
-        uint,
-        uint,
-        uint,
-        address,
-        uint
+        uint256
     )
-    external
-    payable
-    returns(
-        uint,
-        uint,
-        uint
-    )
+        external
+        payable
+        returns (
+            uint256 amountToken,
+            uint256 amountETH,
+            uint256 liquidity
+        )
     {
+        if (attack) {
+            attack =
+                false;
 
+            if (
+                address(this).balance <
+                ethAmount
+            ) {
+                revert InsufficientETH();
+            }
 
-        if(attack)
-        {
-
-            attack = false;
-
-
-            IController(controller)
-            .launch{value: ethAmount}(
+            /*
+             * Intentional reentrancy attempt.
+             *
+             * The real ApexLaunchController must reject this call.
+             */
+            IApexReentrantController(
+                controller
+            ).launch{
+                value: ethAmount
+            }(
                 weth,
                 tokenAmount,
                 ethAmount
             );
-
         }
 
-
-
-
-        return(
-            0,
-            0,
+        return (
+            amountTokenDesired,
+            msg.value,
             1
         );
-
-
     }
 
-
+    receive()
+        external
+        payable
+    {}
 }

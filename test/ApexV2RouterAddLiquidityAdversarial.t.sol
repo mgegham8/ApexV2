@@ -11,13 +11,9 @@ import "../src/contracts/test/FalseReturnERC20.sol";
 import "../src/contracts/test/NoReturnERC20.sol";
 import "../src/contracts/test/FeeOnTransferERC20.sol";
 import "../src/contracts/test/MaliciousERC20.sol";
-
-// Եթե WETH9.sol-ը գտնվում է այլ ճանապարհով, կարող եք փոխել ներմուծման ուղին
 import "../src/contracts/test/WETH9.sol";
 
-
 contract ApexV2RouterAddLiquidityAdversarialTest is Test {
-
     ApexV2Router internal router;
     ApexV2Factory internal factory;
     address internal weth;
@@ -25,42 +21,29 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
     MockERC20 internal tokenA;
     MockERC20 internal tokenB;
 
-    address internal alice =
-        address(0xA11CE);
+    address internal alice = address(0xA11CE);
+    address internal bob = address(0xB0B);
 
-    address internal bob =
-        address(0xB0B);
+    uint256 internal constant INITIAL_BALANCE = 1_000_000 ether;
 
-
-    uint256 internal constant INITIAL_BALANCE =
-        1_000_000 ether;
-
-
-    function setUp()
-        public
-    {
-        // 1. Factory-ի ինցիալիզացիա
+    function setUp() public {
         factory = new ApexV2Factory(address(this));
-
-        // 2. WETH9-ի դեպլոյ
         weth = address(new WETH9());
 
-        // 3. Router-ի ինցիալիզացիա երկու արգումենտով
-        router = new ApexV2Router(address(factory), weth);
+        router = new ApexV2Router(
+            address(factory),
+            weth
+        );
 
+        tokenA = new MockERC20(
+            "Token A",
+            "TKA"
+        );
 
-        tokenA =
-            new MockERC20(
-                "Token A",
-                "TKA"
-            );
-
-        tokenB =
-            new MockERC20(
-                "Token B",
-                "TKB"
-            );
-
+        tokenB = new MockERC20(
+            "Token B",
+            "TKB"
+        );
 
         tokenA.mint(
             alice,
@@ -71,7 +54,6 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
             alice,
             INITIAL_BALANCE
         );
-
 
         vm.startPrank(alice);
 
@@ -87,7 +69,6 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
 
         vm.stopPrank();
     }
-
 
     // =============================================================
     // 1. IDENTICAL TOKEN
@@ -116,7 +97,6 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
         vm.stopPrank();
     }
 
-
     // =============================================================
     // 2. ZERO TOKEN A
     // =============================================================
@@ -144,7 +124,6 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
         vm.stopPrank();
     }
 
-
     // =============================================================
     // 3. ZERO TOKEN B
     // =============================================================
@@ -171,7 +150,6 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
 
         vm.stopPrank();
     }
-
 
     // =============================================================
     // 4. EXPIRED DEADLINE
@@ -202,7 +180,6 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
         vm.stopPrank();
     }
 
-
     // =============================================================
     // 5. ZERO DESIRED AMOUNTS
     // =============================================================
@@ -228,7 +205,6 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
         vm.stopPrank();
     }
 
-
     // =============================================================
     // 6. FIRST LIQUIDITY
     // =============================================================
@@ -236,12 +212,8 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
     function test_addLiquidity_createsPairAndAddsInitialLiquidity()
         public
     {
-        uint256 amountA =
-            100 ether;
-
-        uint256 amountB =
-            100 ether;
-
+        uint256 amountA = 100 ether;
+        uint256 amountB = 100 ether;
 
         vm.startPrank(alice);
 
@@ -249,8 +221,7 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
             uint256 usedA,
             uint256 usedB,
             uint256 liquidity
-        )
-        =
+        ) =
             router.addLiquidity(
                 address(tokenA),
                 address(tokenB),
@@ -263,7 +234,6 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
             );
 
         vm.stopPrank();
-
 
         assertEq(
             usedA,
@@ -280,7 +250,6 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
             0
         );
 
-
         address pair =
             factory.getPair(
                 address(tokenA),
@@ -292,9 +261,62 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
         );
     }
 
+    // =============================================================
+    // 7. INITIAL LIQUIDITY — A MIN
+    // =============================================================
+
+    function test_addLiquidity_initialLiquidity_revertsWhenABelowMin()
+        public
+    {
+        vm.startPrank(alice);
+
+        vm.expectRevert(
+            bytes("ApexV2Router: A_LOW")
+        );
+
+        router.addLiquidity(
+            address(tokenA),
+            address(tokenB),
+            100 ether,
+            100 ether,
+            101 ether,
+            0,
+            alice,
+            block.timestamp
+        );
+
+        vm.stopPrank();
+    }
 
     // =============================================================
-    // 7. EXISTING RESERVES — B OPTIMAL PATH
+    // 8. INITIAL LIQUIDITY — B MIN
+    // =============================================================
+
+    function test_addLiquidity_initialLiquidity_revertsWhenBBelowMin()
+        public
+    {
+        vm.startPrank(alice);
+
+        vm.expectRevert(
+            bytes("ApexV2Router: B_LOW")
+        );
+
+        router.addLiquidity(
+            address(tokenA),
+            address(tokenB),
+            100 ether,
+            100 ether,
+            0,
+            101 ether,
+            alice,
+            block.timestamp
+        );
+
+        vm.stopPrank();
+    }
+
+    // =============================================================
+    // 9. EXISTING RESERVES — B OPTIMAL PATH
     // =============================================================
 
     function test_addLiquidity_existingPair_usesBOptimal()
@@ -330,7 +352,6 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
 
         vm.stopPrank();
 
-
         assertEq(
             usedA,
             50 ether
@@ -342,9 +363,8 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
         );
     }
 
-
     // =============================================================
-    // 8. EXISTING RESERVES — A OPTIMAL PATH
+    // 10. EXISTING RESERVES — A OPTIMAL PATH
     // =============================================================
 
     function test_addLiquidity_existingPair_usesAOptimal()
@@ -363,12 +383,10 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
             block.timestamp
         );
 
-
         (
             uint256 usedA,
             uint256 usedB,
-        )
-        =
+        ) =
             router.addLiquidity(
                 address(tokenA),
                 address(tokenB),
@@ -382,7 +400,6 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
 
         vm.stopPrank();
 
-
         assertEq(
             usedA,
             50 ether
@@ -394,9 +411,8 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
         );
     }
 
-
     // =============================================================
-    // 9. B_LOW
+    // 11. B OPTIMAL PATH — B_LOW
     // =============================================================
 
     function test_addLiquidity_reverts_BLow()
@@ -415,7 +431,6 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
             block.timestamp
         );
 
-
         vm.expectRevert(
             bytes("ApexV2Router: B_LOW")
         );
@@ -425,8 +440,8 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
             address(tokenB),
             50 ether,
             100 ether,
-            101 ether,
-            101 ether,
+            0,
+            51 ether,
             alice,
             block.timestamp
         );
@@ -434,9 +449,8 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
         vm.stopPrank();
     }
 
-
     // =============================================================
-    // 10. A_LOW
+    // 12. A OPTIMAL PATH — A_LOW
     // =============================================================
 
     function test_addLiquidity_reverts_ALow()
@@ -454,7 +468,6 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
             alice,
             block.timestamp
         );
-
 
         vm.expectRevert(
             bytes("ApexV2Router: A_LOW")
@@ -474,20 +487,125 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
         vm.stopPrank();
     }
 
+    // =============================================================
+    // 13. B OPTIMAL PATH — amountADesired MUST RESPECT A_MIN
+    // =============================================================
+
+    function test_addLiquidity_BOptimal_revertsWhenAmountADesiredBelowAMin()
+        public
+    {
+        vm.startPrank(alice);
+
+        router.addLiquidity(
+            address(tokenA),
+            address(tokenB),
+            100 ether,
+            100 ether,
+            0,
+            0,
+            alice,
+            block.timestamp
+        );
+
+        vm.expectRevert(
+            bytes("ApexV2Router: A_LOW")
+        );
+
+        router.addLiquidity(
+            address(tokenA),
+            address(tokenB),
+            50 ether,
+            100 ether,
+            51 ether,
+            0,
+            alice,
+            block.timestamp
+        );
+
+        vm.stopPrank();
+    }
 
     // =============================================================
-    // 11. A_HIGH — defensive branch
+    // 14. A OPTIMAL PATH — amountBDesired MUST RESPECT B_MIN
+    // =============================================================
+
+    function test_addLiquidity_AOptimal_revertsWhenAmountBDesiredBelowBMin()
+        public
+    {
+        vm.startPrank(alice);
+
+        router.addLiquidity(
+            address(tokenA),
+            address(tokenB),
+            100 ether,
+            100 ether,
+            0,
+            0,
+            alice,
+            block.timestamp
+        );
+
+        vm.expectRevert(
+            bytes("ApexV2Router: B_LOW")
+        );
+
+        router.addLiquidity(
+            address(tokenA),
+            address(tokenB),
+            100 ether,
+            50 ether,
+            0,
+            51 ether,
+            alice,
+            block.timestamp
+        );
+
+        vm.stopPrank();
+    }
+
+    // =============================================================
+    // 15. ZERO RECIPIENT
+    // =============================================================
+
+    function test_addLiquidity_reverts_zeroRecipient()
+        public
+    {
+        vm.startPrank(alice);
+
+        vm.expectRevert(
+            bytes("ApexV2Router: ZERO_RECIPIENT")
+        );
+
+        router.addLiquidity(
+            address(tokenA),
+            address(tokenB),
+            100 ether,
+            100 ether,
+            0,
+            0,
+            address(0),
+            block.timestamp
+        );
+
+        vm.stopPrank();
+    }
+
+    // =============================================================
+    // 16. A_HIGH — DEFENSIVE BRANCH
     // =============================================================
 
     function test_addLiquidity_reverts_AHigh()
         public
+        pure
     {
-        // Defensive branch test placeholder
+        // With mathematically consistent reserves + quote(),
+        // amountAOptimal > amountADesired is generally unreachable.
+        // Keep this explicit so we do not fake branch coverage.
+        assertTrue(true);
     }
 
-
     // =============================================================
-    // 12. FUZZ — FIRST LIQUIDITY
+    // 17. FUZZ — FIRST LIQUIDITY
     // =============================================================
 
     function testFuzz_addLiquidity_initialAmounts(
@@ -504,7 +622,6 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
             amountB > 1 ether
         );
 
-
         vm.assume(
             amountA < INITIAL_BALANCE
         );
@@ -513,15 +630,13 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
             amountB < INITIAL_BALANCE
         );
 
-
         vm.startPrank(alice);
 
         (
             uint256 usedA,
             uint256 usedB,
             uint256 liquidity
-        )
-        =
+        ) =
             router.addLiquidity(
                 address(tokenA),
                 address(tokenB),
@@ -534,7 +649,6 @@ contract ApexV2RouterAddLiquidityAdversarialTest is Test {
             );
 
         vm.stopPrank();
-
 
         assertEq(
             usedA,

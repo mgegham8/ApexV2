@@ -1,119 +1,127 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.28;
 
 contract WETH9 {
+    string public name =
+        "Wrapped Ether";
 
-    string public name = "Wrapped Ether";
-    string public symbol = "WETH";
-    uint8 public decimals = 18;
+    string public symbol =
+        "WETH";
 
+    uint8 public constant decimals =
+        18;
 
-    mapping(address => uint) public balanceOf;
+    mapping(address => uint256)
+        public balanceOf;
 
-    mapping(address => mapping(address => uint))
+    mapping(address => mapping(address => uint256))
         public allowance;
-
-
 
     event Deposit(
         address indexed dst,
-        uint wad
+        uint256 wad
     );
-
 
     event Withdrawal(
         address indexed src,
-        uint wad
+        uint256 wad
     );
-
 
     event Transfer(
         address indexed from,
         address indexed to,
-        uint value
+        uint256 value
     );
-
 
     event Approval(
         address indexed owner,
         address indexed spender,
-        uint value
+        uint256 value
     );
 
-
-
     receive()
-    external
-    payable
+        external
+        payable
     {
         deposit();
     }
 
-
-
     function deposit()
-    public
-    payable
+        public
+        payable
     {
-
-        balanceOf[msg.sender] += msg.value;
-
+        balanceOf[msg.sender] +=
+            msg.value;
 
         emit Deposit(
             msg.sender,
             msg.value
         );
-
     }
 
-
-
     function withdraw(
-        uint wad
+        uint256 wad
     )
-    public
+        public
     {
+        uint256 balance =
+            balanceOf[msg.sender];
 
         require(
-            balanceOf[msg.sender] >= wad,
+            balance >= wad,
             "WETH: balance"
         );
 
+        unchecked {
+            balanceOf[msg.sender] =
+                balance - wad;
+        }
 
-        balanceOf[msg.sender] -= wad;
+        (
+            bool success,
+        ) =
+            payable(msg.sender).call{
+                value: wad
+            }("");
 
-
-        payable(msg.sender)
-        .transfer(wad);
-
-
+        require(
+            success,
+            "WETH: ETH_TRANSFER_FAILED"
+        );
 
         emit Withdrawal(
             msg.sender,
             wad
         );
-
     }
-
-
 
     function transfer(
         address to,
-        uint value
+        uint256 value
     )
-    public
-    returns(bool)
+        public
+        returns (bool)
     {
+        require(
+            to != address(0),
+            "WETH: zero address"
+        );
+
+        uint256 balance =
+            balanceOf[msg.sender];
 
         require(
-            balanceOf[msg.sender] >= value,
+            balance >= value,
             "WETH: balance"
         );
 
+        unchecked {
+            balanceOf[msg.sender] =
+                balance - value;
+        }
 
-        balanceOf[msg.sender] -= value;
-        balanceOf[to] += value;
-
+        balanceOf[to] +=
+            value;
 
         emit Transfer(
             msg.sender,
@@ -121,24 +129,18 @@ contract WETH9 {
             value
         );
 
-
         return true;
-
     }
-
-
-
 
     function approve(
         address spender,
-        uint value
+        uint256 value
     )
-    public
-    returns(bool)
+        public
+        returns (bool)
     {
-
-        allowance[msg.sender][spender] = value;
-
+        allowance[msg.sender][spender] =
+            value;
 
         emit Approval(
             msg.sender,
@@ -146,47 +148,65 @@ contract WETH9 {
             value
         );
 
-
         return true;
-
     }
-
-
-
 
     function transferFrom(
         address from,
         address to,
-        uint value
+        uint256 value
     )
-    public
-    returns(bool)
+        public
+        returns (bool)
     {
+        require(
+            to != address(0),
+            "WETH: zero address"
+        );
 
+        uint256 balance =
+            balanceOf[from];
 
         require(
-            balanceOf[from] >= value,
+            balance >= value,
             "WETH: balance"
         );
 
-
-        if(from != msg.sender){
+        if (
+            from != msg.sender
+        ) {
+            uint256 allowed =
+                allowance[from][msg.sender];
 
             require(
-                allowance[from][msg.sender] >= value,
+                allowed >= value,
                 "WETH: allowance"
             );
 
+            if (
+                allowed !=
+                type(uint256).max
+            ) {
+                unchecked {
+                    allowance[from][msg.sender] =
+                        allowed - value;
+                }
 
-            allowance[from][msg.sender] -= value;
-
+                emit Approval(
+                    from,
+                    msg.sender,
+                    allowance[from][msg.sender]
+                );
+            }
         }
 
+        unchecked {
+            balanceOf[from] =
+                balance - value;
+        }
 
-        balanceOf[from] -= value;
-        balanceOf[to] += value;
-
-
+        balanceOf[to] +=
+            value;
 
         emit Transfer(
             from,
@@ -194,9 +214,6 @@ contract WETH9 {
             value
         );
 
-
         return true;
-
     }
-
 }

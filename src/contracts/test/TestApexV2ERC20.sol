@@ -3,13 +3,10 @@ pragma solidity 0.8.28;
 
 import "../ApexV2ERC20.sol";
 
-
 contract TestApexV2ERC20 is ApexV2ERC20 {
-
-
     function mint(
         address to,
-        uint amount
+        uint256 amount
     )
         external
     {
@@ -19,10 +16,8 @@ contract TestApexV2ERC20 is ApexV2ERC20 {
         );
     }
 
-
-
     function burn(
-        uint amount
+        uint256 amount
     )
         external
     {
@@ -32,4 +27,17 @@ contract TestApexV2ERC20 is ApexV2ERC20 {
         );
     }
 
+    function transferInternal(
+        address from,
+        address to,
+        uint256 amount
+    )
+        external
+    {
+        _transfer(
+            from,
+            to,
+            amount
+        );
+    }
 }

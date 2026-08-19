@@ -16,8 +16,18 @@ contract ApexV2OracleManipulationAdvancedTest is Test {
     MockERC20 weth;
 
     function setUp() public {
-        MockERC20 tokenA = new MockERC20("Token0", "TK0");
-        MockERC20 tokenB = new MockERC20("Token1", "TK1");
+        MockERC20 tokenA =
+            new MockERC20(
+                "Token0",
+                "TK0"
+            );
+
+        MockERC20 tokenB =
+            new MockERC20(
+                "Token1",
+                "TK1"
+            );
+
         if (address(tokenA) < address(tokenB)) {
             token0 = tokenA;
             token1 = tokenB;
@@ -26,47 +36,115 @@ contract ApexV2OracleManipulationAdvancedTest is Test {
             token1 = tokenA;
         }
 
-        weth = new MockERC20("WETH", "WETH");
-        factory = new ApexV2Factory(address(this));
-        pair = ApexV2Pair(factory.createPair(address(token0), address(token1)));
-        router = new ApexV2Router(address(factory), address(weth));
+        weth =
+            new MockERC20(
+                "WETH",
+                "WETH"
+            );
 
-        // Initial liquidity
-        token0.mint(address(this), 1000 ether);
-        token1.mint(address(this), 1000 ether);
-        token0.transfer(address(pair), 1000 ether);
-        token1.transfer(address(pair), 1000 ether);
-        pair.mint(address(this));
+        factory =
+            new ApexV2Factory(
+                address(this)
+            );
+
+        pair =
+            ApexV2Pair(
+                factory.createPair(
+                    address(token0),
+                    address(token1)
+                )
+            );
+
+        router =
+            new ApexV2Router(
+                address(factory),
+                address(weth)
+            );
+
+        token0.mint(
+            address(this),
+            1000 ether
+        );
+
+        token1.mint(
+            address(this),
+            1000 ether
+        );
+
+        token0.transfer(
+            address(pair),
+            1000 ether
+        );
+
+        token1.transfer(
+            address(pair),
+            1000 ether
+        );
+
+        pair.mint(
+            address(this)
+        );
     }
 
-    function testFlashLoanAndSwapSameBlockOracleManipulation() public {
-        // Record initial cumulative price
-        (, , uint32 blockTimestampLast1) = pair.getReserves();
-        uint256 initialPriceCumulative = pair.price0CumulativeLast();
+    function testFlashLoanAndSwapSameBlockOracleManipulation()
+        public
+    {
+        uint256 initialPriceCumulative =
+            pair.price0CumulativeLast();
 
-        // Attacker performs massive swap in the same block (Flash loan simulation)
-        token0.mint(address(this), 5000 ether);
-        token0.transfer(address(pair), 5000 ether);
-        
-        // Trigger swap
-        pair.swap(0, 800 ether, address(this), "");
+        token0.mint(
+            address(this),
+            5000 ether
+        );
 
-        // Price cumulative should NOT update within the same block because time elapsed is 0
-        uint256 priceCumulativeAfterSameBlock = pair.price0CumulativeLast();
-        assertEq(initialPriceCumulative, priceCumulativeAfterSameBlock, "Cumulative price changed within the same block");
+        token0.transfer(
+            address(pair),
+            5000 ether
+        );
 
-        // Advance time and blocks
-        warpToNextBlock(1 hours);
+        pair.swap(
+            0,
+            800 ether,
+            address(this),
+            ""
+        );
 
-        // Interact again to update oracle
+        uint256 priceCumulativeAfterSameBlock =
+            pair.price0CumulativeLast();
+
+        assertEq(
+            initialPriceCumulative,
+            priceCumulativeAfterSameBlock,
+            "Cumulative price changed within the same block"
+        );
+
+        warpToNextBlock(
+            1 hours
+        );
+
         pair.sync();
 
-        uint256 priceCumulativeAfterTime = pair.price0CumulativeLast();
-        assertTrue(priceCumulativeAfterTime > initialPriceCumulative, "Oracle failed to accumulate price after time passed");
+        uint256 priceCumulativeAfterTime =
+            pair.price0CumulativeLast();
+
+        assertTrue(
+            priceCumulativeAfterTime >
+                initialPriceCumulative,
+            "Oracle failed to accumulate price after time passed"
+        );
     }
 
-    function warpToNextBlock(uint256 timeDelta) internal {
-        vm.warp(block.timestamp + timeDelta);
-        vm.roll(block.number + 1);
+    function warpToNextBlock(
+        uint256 timeDelta
+    )
+        internal
+    {
+        vm.warp(
+            block.timestamp + timeDelta
+        );
+
+        vm.roll(
+            block.number + 1
+        );
     }
 }

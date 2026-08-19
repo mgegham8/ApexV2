@@ -1,52 +1,55 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
-
+pragma solidity 0.8.28;
 
 contract MockFeeToken {
+    string public name =
+        "Fee Token";
 
+    string public symbol =
+        "FEE";
 
-    string public name = "Fee Token";
-    string public symbol = "FEE";
-    uint8 public decimals = 18;
+    uint8 public constant decimals =
+        18;
 
+    uint256 public totalSupply;
 
-    uint public totalSupply;
+    mapping(address => uint256)
+        public balanceOf;
 
-
-    mapping(address => uint) public balanceOf;
-
-    mapping(address => mapping(address => uint))
+    mapping(address => mapping(address => uint256))
         public allowance;
 
-
+    uint256 public constant FEE =
+        1; // 1%
 
     event Transfer(
         address indexed from,
         address indexed to,
-        uint value
+        uint256 value
     );
-
 
     event Approval(
         address indexed owner,
         address indexed spender,
-        uint value
+        uint256 value
     );
-
-
-
-    uint public constant FEE = 1;
-
-
 
     function mint(
         address to,
-        uint amount
+        uint256 amount
     )
         external
     {
-        balanceOf[to] += amount;
-        totalSupply += amount;
+        require(
+            to != address(0),
+            "ZERO_ADDRESS"
+        );
+
+        balanceOf[to] +=
+            amount;
+
+        totalSupply +=
+            amount;
 
         emit Transfer(
             address(0),
@@ -55,20 +58,15 @@ contract MockFeeToken {
         );
     }
 
-
-
-
-
     function approve(
         address spender,
-        uint amount
+        uint256 amount
     )
         external
-        returns(bool)
+        returns (bool)
     {
-
-        allowance[msg.sender][spender] = amount;
-
+        allowance[msg.sender][spender] =
+            amount;
 
         emit Approval(
             msg.sender,
@@ -76,93 +74,99 @@ contract MockFeeToken {
             amount
         );
 
-
         return true;
     }
-
-
-
 
     function transfer(
         address to,
-        uint amount
+        uint256 amount
     )
         external
-        returns(bool)
+        returns (bool)
     {
-
-        uint feeAmount =
-            amount * FEE / 100;
-
-
-        uint sendAmount =
-            amount - feeAmount;
-
-
-
-        balanceOf[msg.sender] -= amount;
-
-        balanceOf[to] += sendAmount;
-
-
-
-        totalSupply -= feeAmount;
-
-
-
-        emit Transfer(
+        _transfer(
             msg.sender,
             to,
-            sendAmount
+            amount
         );
-
 
         return true;
     }
-
-
-
-
 
     function transferFrom(
         address from,
         address to,
-        uint amount
+        uint256 amount
     )
         external
-        returns(bool)
+        returns (bool)
     {
-
-
-        uint allowed =
+        uint256 allowed =
             allowance[from][msg.sender];
 
+        require(
+            allowed >= amount,
+            "ALLOWANCE_LOW"
+        );
 
-        if(allowed != type(uint).max)
-        {
-            allowance[from][msg.sender] =
-                allowed - amount;
+        if (
+            allowed !=
+            type(uint256).max
+        ) {
+            unchecked {
+                allowance[from][msg.sender] =
+                    allowed - amount;
+            }
+
+            emit Approval(
+                from,
+                msg.sender,
+                allowance[from][msg.sender]
+            );
         }
 
+        _transfer(
+            from,
+            to,
+            amount
+        );
 
+        return true;
+    }
 
-        uint feeAmount =
+    function _transfer(
+        address from,
+        address to,
+        uint256 amount
+    )
+        internal
+    {
+        require(
+            to != address(0),
+            "ZERO_ADDRESS"
+        );
+
+        uint256 fromBalance =
+            balanceOf[from];
+
+        require(
+            fromBalance >= amount,
+            "BALANCE_LOW"
+        );
+
+        uint256 feeAmount =
             amount * FEE / 100;
 
-
-        uint sendAmount =
+        uint256 sendAmount =
             amount - feeAmount;
 
+        unchecked {
+            balanceOf[from] =
+                fromBalance - amount;
+        }
 
-
-        balanceOf[from] -= amount;
-
-        balanceOf[to] += sendAmount;
-
-
-        totalSupply -= feeAmount;
-
-
+        balanceOf[to] +=
+            sendAmount;
 
         emit Transfer(
             from,
@@ -170,8 +174,17 @@ contract MockFeeToken {
             sendAmount
         );
 
+        if (
+            feeAmount != 0
+        ) {
+            totalSupply -=
+                feeAmount;
 
-        return true;
+            emit Transfer(
+                from,
+                address(0),
+                feeAmount
+            );
+        }
     }
-
 }

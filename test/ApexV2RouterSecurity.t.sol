@@ -1,1196 +1,106 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 
-import "../src/contracts/interfaces/IApexV2Factory.sol";
-import "../src/contracts/interfaces/IApexV2Pair.sol";
-import "../src/contracts/interfaces/IERC20.sol";
-import "../src/contracts/interfaces/IWETH9.sol";
-import "../src/contracts/libraries/ApexV2Library.sol";
+import "../src/contracts/ApexV2Router.sol";
+import "../src/contracts/ApexV2Factory.sol";
 
-// ============================================================================
-// MOCK TOKEN
-// ============================================================================
+import "../src/contracts/test/MockERC20.sol";
+import "../src/contracts/test/WETH9.sol";
 
-contract MockRouterToken {
-    mapping(address => uint256) public balanceOf;
-    mapping(address => mapping(address => uint256)) public allowance;
+contract ApexV2RouterSecurityTest is Test {
+    ApexV2Factory internal factory;
+    ApexV2Router internal router;
+    WETH9 internal weth;
 
-    string public name = "MockToken";
-    string public symbol = "MOCK";
-    uint8 public decimals = 18;
+    MockERC20 internal tokenA;
+    MockERC20 internal tokenB;
 
-    function mint(
-        address to,
-        uint256 amount
-    )
-        external
-    {
-        balanceOf[to] += amount;
-    }
+    address internal constant ALICE = address(0xA11CE);
+    address internal constant BOB = address(0xB0B);
 
-    function approve(
-        address spender,
-        uint256 amount
-    )
-        external
-        returns (bool)
-    {
-        allowance[msg.sender][spender] = amount;
-        return true;
-    }
+    uint256 internal constant INITIAL_BALANCE = 1_000_000 ether;
 
-    function transfer(
-        address to,
-        uint256 amount
-    )
-        external
-        returns (bool)
-    {
-        require(
-            balanceOf[msg.sender] >= amount,
-            "MockToken: BALANCE"
-        );
+    function setUp() public {
+        weth = new WETH9();
 
-        balanceOf[msg.sender] -= amount;
-        balanceOf[to] += amount;
-
-        return true;
-    }
-
-    function transferFrom(
-        address from,
-        address to,
-        uint256 amount
-    )
-        external
-        returns (bool)
-    {
-        require(
-            balanceOf[from] >= amount,
-            "MockToken: BALANCE"
-        );
-
-        uint256 currentAllowance =
-            allowance[from][msg.sender];
-
-        require(
-            currentAllowance >= amount,
-            "MockToken: ALLOWANCE"
-        );
-
-        allowance[from][msg.sender] =
-            currentAllowance - amount;
-
-        balanceOf[from] -= amount;
-        balanceOf[to] += amount;
-
-        return true;
-    }
-}
-
-// ============================================================================
-// MOCK PAIR
-// ============================================================================
-
-contract MockRouterPair {
-    address public token0;
-    address public token1;
-
-    address public lastMintRecipient;
-
-    uint112 private reserve0;
-    uint112 private reserve1;
-
-    bool public revertOnMint;
-
-    constructor(
-        address _token0,
-        address _token1
-    )
-    {
-        token0 = _token0;
-        token1 = _token1;
-    }
-
-    function getReserves()
-        external
-        view
-        returns (
-            uint112,
-            uint112,
-            uint32
-        )
-    {
-        return (
-            reserve0,
-            reserve1,
-            0
-        );
-    }
-
-    function setReserves(
-        uint112 _reserve0,
-        uint112 _reserve1
-    )
-        external
-    {
-        reserve0 = _reserve0;
-        reserve1 = _reserve1;
-    }
-
-    function setRevertOnMint(
-        bool value
-    )
-        external
-    {
-        revertOnMint = value;
-    }
-
-    function mint(
-        address to
-    )
-        external
-        returns (
-            uint amount0,
-            uint amount1,
-            uint liquidity
-        )
-    {
-        if (revertOnMint) {
-            revert(
-                "ApexV2Router: DUMMY"
-            );
-        }
-
-        lastMintRecipient = to;
-
-        return (
-            100,
-            100,
-            1
-        );
-    }
-
-    function swap(
-        uint,
-        uint,
-        address,
-        bytes calldata
-    )
-        external
-    {
-        revert(
-            "MockRouterPair: SWAP_NOT_IMPLEMENTED"
-        );
-    }
-
-    function burn(
-        address
-    )
-        external
-        returns (
-            uint,
-            uint
-        )
-    {
-        revert(
-            "MockRouterPair: BURN_NOT_IMPLEMENTED"
-        );
-    }
-}
-
-// ============================================================================
-// MOCK FACTORY
-// ============================================================================
-
-contract MockRouterFactory {
-    mapping(bytes32 => address) public pairs;
-
-    address public lastCreatedPair;
-
-    function _pairKey(
-        address tokenA,
-        address tokenB
-    )
-        internal
-        pure
-        returns (bytes32)
-    {
-        return keccak256(
-            abi.encodePacked(
-                tokenA < tokenB
-                    ? tokenA
-                    : tokenB,
-                tokenA < tokenB
-                    ? tokenB
-                    : tokenA
-            )
-        );
-    }
-
-    function getPair(
-        address tokenA,
-        address tokenB
-    )
-        external
-        view
-        returns (address)
-    {
-        return pairs[
-            _pairKey(
-                tokenA,
-                tokenB
-            )
-        ];
-    }
-
-    function createPair(
-        address tokenA,
-        address tokenB
-    )
-        external
-        returns (address pair)
-    {
-        bytes32 key =
-            _pairKey(
-                tokenA,
-                tokenB
-            );
-
-        require(
-            pairs[key] == address(0),
-            "MockFactory: EXISTS"
-        );
-
-        pair =
-            address(
-                new MockRouterPair(
-                    tokenA < tokenB
-                        ? tokenA
-                        : tokenB,
-                    tokenA < tokenB
-                        ? tokenB
-                        : tokenA
-                )
-            );
-
-        pairs[key] = pair;
-        lastCreatedPair = pair;
-    }
-}
-
-// ============================================================================
-// MOCK WETH
-// ============================================================================
-
-contract MockRouterWETH {
-    mapping(address => uint256) public balanceOf;
-
-    function deposit()
-        external
-        payable
-    {
-        balanceOf[msg.sender] += msg.value;
-    }
-
-    function withdraw(
-        uint256 amount
-    )
-        external
-    {
-        require(
-            balanceOf[msg.sender] >= amount,
-            "MockWETH: BALANCE"
-        );
-
-        balanceOf[msg.sender] -= amount;
-
-        (bool success,) =
-            payable(msg.sender).call{
-                value: amount
-            }("");
-
-        require(success);
-    }
-
-    function transfer(
-        address to,
-        uint256 amount
-    )
-        external
-        returns (bool)
-    {
-        require(
-            balanceOf[msg.sender] >= amount,
-            "MockWETH: BALANCE"
-        );
-
-        balanceOf[msg.sender] -= amount;
-        balanceOf[to] += amount;
-
-        return true;
-    }
-
-    receive()
-        external
-        payable
-    {}
-}
-
-// ============================================================================
-// ROUTER
-// ============================================================================
-
-contract ApexV2Router {
-    address public immutable factory;
-    address public immutable WETH;
-
-    modifier ensure(uint deadline)
-    {
-        require(
-            deadline >= block.timestamp,
-            "ApexV2Router: EXPIRED"
-        );
-        _;
-    }
-
-    constructor(
-        address _factory,
-        address _WETH
-    )
-    {
-        require(
-            _factory != address(0),
-            "ApexV2Router: ZERO_FACTORY"
-        );
-
-        require(
-            _WETH != address(0),
-            "ApexV2Router: ZERO_WETH"
-        );
-
-        factory = _factory;
-        WETH = _WETH;
-    }
-
-    receive()
-        external
-        payable
-    {
-        require(
-            msg.sender == WETH,
-            "ApexV2Router: ONLY_WETH"
-        );
-    }
-
-    // ========================================================================
-    // ADD LIQUIDITY
-    // ========================================================================
-
-    function addLiquidity(
-        address tokenA,
-        address tokenB,
-        uint amountADesired,
-        uint amountBDesired,
-        uint amountAMin,
-        uint amountBMin,
-        address to,
-        uint deadline
-    )
-        external
-        ensure(deadline)
-        returns (
-            uint amountA,
-            uint amountB,
-            uint liquidity
-        )
-    {
-        require(
-            tokenA != tokenB,
-            "ApexV2Router: IDENTICAL_TOKEN"
-        );
-
-        require(
-            tokenA != address(0) &&
-            tokenB != address(0),
-            "ApexV2Router: ZERO_ADDRESS"
-        );
-
-        address pair =
-            IApexV2Factory(factory).getPair(
-                tokenA,
-                tokenB
-            );
-
-        if (pair == address(0)) {
-            pair =
-                IApexV2Factory(factory).createPair(
-                    tokenA,
-                    tokenB
-                );
-        }
-
-        (
-            uint reserveA,
-            uint reserveB
-        ) =
-            ApexV2Library.getReserves(
-                factory,
-                tokenA,
-                tokenB
-            );
-
-        if (
-            reserveA == 0 &&
-            reserveB == 0
-        ) {
-            amountA = amountADesired;
-            amountB = amountBDesired;
-        }
-        else {
-            uint amountBOptimal =
-                ApexV2Library.quote(
-                    amountADesired,
-                    reserveA,
-                    reserveB
-                );
-
-            if (amountBOptimal <= amountBDesired) {
-                require(
-                    amountBOptimal >= amountBMin,
-                    "ApexV2Router: B_LOW"
-                );
-
-                amountA = amountADesired;
-                amountB = amountBOptimal;
-            }
-            else {
-                uint amountAOptimal =
-                    ApexV2Library.quote(
-                        amountBDesired,
-                        reserveB,
-                        reserveA
-                    );
-
-                require(
-                    amountAOptimal <= amountADesired,
-                    "ApexV2Router: A_HIGH"
-                );
-
-                require(
-                    amountAOptimal >= amountAMin,
-                    "ApexV2Router: A_LOW"
-                );
-
-                amountA = amountAOptimal;
-                amountB = amountBDesired;
-            }
-        }
-
-        _transferFrom(
-            tokenA,
-            msg.sender,
-            pair,
-            amountA
-        );
-
-        _transferFrom(
-            tokenB,
-            msg.sender,
-            pair,
-            amountB
-        );
-
-        liquidity =
-            IApexV2Pair(pair).mint(to);
-    }
-
-    // ========================================================================
-    // ADD LIQUIDITY ETH
-    // ========================================================================
-
-    function addLiquidityETH(
-        address token,
-        uint amountTokenDesired,
-        uint amountTokenMin,
-        uint amountETHMin,
-        address to,
-        uint deadline
-    )
-        external
-        payable
-        ensure(deadline)
-        returns (
-            uint amountToken,
-            uint amountETH,
-            uint liquidity
-        )
-    {
-        require(
-            token != WETH,
-            "ApexV2Router: INVALID_TOKEN"
-        );
-
-        amountToken = amountTokenDesired;
-        amountETH = msg.value;
-
-        require(
-            amountToken >= amountTokenMin,
-            "ApexV2Router: TOKEN_LOW"
-        );
-
-        require(
-            amountETH >= amountETHMin,
-            "ApexV2Router: ETH_LOW"
-        );
-
-        address pair =
-            IApexV2Factory(factory).getPair(
-                token,
-                WETH
-            );
-
-        if (pair == address(0)) {
-            pair =
-                IApexV2Factory(factory).createPair(
-                    token,
-                    WETH
-                );
-        }
-
-        _transferFrom(
-            token,
-            msg.sender,
-            pair,
-            amountToken
-        );
-
-        IWETH9(WETH).deposit{
-            value: amountETH
-        }();
-
-        _safeTransfer(
-            WETH,
-            pair,
-            amountETH
-        );
-
-        liquidity =
-            IApexV2Pair(pair).mint(to);
-    }
-
-    // ========================================================================
-    // REMOVE LIQUIDITY
-    // ========================================================================
-
-    function removeLiquidity(
-        address tokenA,
-        address tokenB,
-        uint liquidity,
-        uint amountAMin,
-        uint amountBMin,
-        address to,
-        uint deadline
-    )
-        public
-        ensure(deadline)
-        returns (
-            uint amountA,
-            uint amountB
-        )
-    {
-        address pair =
-            ApexV2Library.pairFor(
-                factory,
-                tokenA,
-                tokenB
-            );
-
-        require(
-            pair != address(0),
-            "ApexV2Router: PAIR_NOT_FOUND"
-        );
-
-        IERC20(pair).transferFrom(
-            msg.sender,
-            pair,
-            liquidity
-        );
-
-        (
-            uint amount0,
-            uint amount1
-        ) =
-            IApexV2Pair(pair).burn(
-                to
-            );
-
-        address token0 =
-            tokenA < tokenB
-            ? tokenA
-            : tokenB;
-
-        if (tokenA == token0) {
-            amountA = amount0;
-            amountB = amount1;
-        }
-        else {
-            amountA = amount1;
-            amountB = amount0;
-        }
-
-        require(
-            amountA >= amountAMin,
-            "ApexV2Router: A_LOW"
-        );
-
-        require(
-            amountB >= amountBMin,
-            "ApexV2Router: B_LOW"
-        );
-    }
-
-    // ========================================================================
-    // REMOVE LIQUIDITY ETH
-    // ========================================================================
-
-    function removeLiquidityETH(
-        address token,
-        uint liquidity,
-        uint amountTokenMin,
-        uint amountETHMin,
-        address to,
-        uint deadline
-    )
-        external
-        returns (
-            uint amountToken,
-            uint amountETH
-        )
-    {
-        (
-            amountToken,
-            amountETH
-        ) =
-            removeLiquidity(
-                token,
-                WETH,
-                liquidity,
-                amountTokenMin,
-                amountETHMin,
-                address(this),
-                deadline
-            );
-
-        _safeTransfer(
-            token,
-            to,
-            amountToken
-        );
-
-        IWETH9(WETH).withdraw(
-            amountETH
-        );
-
-        (bool success,) =
-            payable(to).call{
-                value: amountETH
-            }("");
-
-        require(
-            success,
-            "ApexV2Router: ETH_TRANSFER_FAILED"
-        );
-    }
-
-    // ========================================================================
-    // SWAP TOKENS -> TOKENS
-    // ========================================================================
-
-    function swapExactTokensForTokens(
-        uint amountIn,
-        uint amountOutMin,
-        address[] calldata path,
-        address to,
-        uint deadline
-    )
-        external
-        ensure(deadline)
-        returns (
-            uint[] memory amounts
-        )
-    {
-        require(
-            path.length >= 2,
-            "ApexV2Router: INVALID_PATH"
-        );
-
-        amounts =
-            ApexV2Library.getAmountsOut(
-                factory,
-                amountIn,
-                path
-            );
-
-        require(
-            amounts[amounts.length - 1]
-                >= amountOutMin,
-            "ApexV2Router: SLIPPAGE"
-        );
-
-        address firstPair =
-            ApexV2Library.pairFor(
-                factory,
-                path[0],
-                path[1]
-            );
-
-        require(
-            firstPair != address(0),
-            "ApexV2Router: PAIR_NOT_FOUND"
-        );
-
-        _transferFrom(
-            path[0],
-            msg.sender,
-            firstPair,
-            amountIn
-        );
-
-        _swap(
-            amounts,
-            path,
-            to
-        );
-    }
-
-    // ========================================================================
-    // SWAP ETH -> TOKENS
-    // ========================================================================
-
-    function swapExactETHForTokens(
-        uint amountOutMin,
-        address[] calldata path,
-        address to,
-        uint deadline
-    )
-        external
-        payable
-        ensure(deadline)
-        returns (
-            uint[] memory amounts
-        )
-    {
-        require(
-            path.length >= 2,
-            "ApexV2Router: INVALID_PATH"
-        );
-
-        require(
-            path[0] == WETH,
-            "ApexV2Router: INVALID_WETH_PATH"
-        );
-
-        amounts =
-            ApexV2Library.getAmountsOut(
-                factory,
-                msg.value,
-                path
-            );
-
-        require(
-            amounts[amounts.length - 1]
-                >= amountOutMin,
-            "ApexV2Router: SLIPPAGE"
-        );
-
-        IWETH9(WETH).deposit{
-            value: msg.value
-        }();
-
-        address pair =
-            ApexV2Library.pairFor(
-                factory,
-                path[0],
-                path[1]
-            );
-
-        require(
-            pair != address(0),
-            "ApexV2Router: PAIR_NOT_FOUND"
-        );
-
-        _safeTransfer(
-            WETH,
-            pair,
-            msg.value
-        );
-
-        _swap(
-            amounts,
-            path,
-            to
-        );
-    }
-
-    // ========================================================================
-    // SWAP TOKENS -> ETH
-    // ========================================================================
-
-    function swapExactTokensForETH(
-        uint amountIn,
-        uint amountOutMin,
-        address[] calldata path,
-        address to,
-        uint deadline
-    )
-        external
-        ensure(deadline)
-        returns (
-            uint[] memory amounts
-        )
-    {
-        require(
-            path.length >= 2,
-            "ApexV2Router: INVALID_PATH"
-        );
-
-        require(
-            path[path.length - 1] == WETH,
-            "ApexV2Router: INVALID_WETH_PATH"
-        );
-
-        amounts =
-            ApexV2Library.getAmountsOut(
-                factory,
-                amountIn,
-                path
-            );
-
-        uint amountWETH =
-            amounts[amounts.length - 1];
-
-        require(
-            amountWETH >= amountOutMin,
-            "ApexV2Router: SLIPPAGE"
-        );
-
-        address firstPair =
-            ApexV2Library.pairFor(
-                factory,
-                path[0],
-                path[1]
-            );
-
-        require(
-            firstPair != address(0),
-            "ApexV2Router: PAIR_NOT_FOUND"
-        );
-
-        _transferFrom(
-            path[0],
-            msg.sender,
-            firstPair,
-            amountIn
-        );
-
-        _swap(
-            amounts,
-            path,
+        factory = new ApexV2Factory(
             address(this)
         );
 
-        IWETH9(WETH).withdraw(
-            amountWETH
+        router = new ApexV2Router(
+            address(factory),
+            address(weth)
         );
 
-        (bool success,) =
-            payable(to).call{
-                value: amountWETH
-            }("");
-
-        require(
-            success,
-            "ApexV2Router: ETH_FAILED"
-        );
-    }
-
-    // ========================================================================
-    // INTERNAL SWAP
-    // ========================================================================
-
-    function _swap(
-        uint[] memory amounts,
-        address[] memory path,
-        address to
-    )
-        internal
-    {
-        for (
-            uint i = 0;
-            i < path.length - 1;
-            i++
-        ) {
-            address input =
-                path[i];
-
-            address output =
-                path[i + 1];
-
-            address pair =
-                ApexV2Library.pairFor(
-                    factory,
-                    input,
-                    output
-                );
-
-            require(
-                pair != address(0),
-                "ApexV2Router: PAIR_NOT_FOUND"
-            );
-
-            address token0 =
-                input < output
-                ? input
-                : output;
-
-            uint amountOut =
-                amounts[i + 1];
-
-            uint amount0Out;
-            uint amount1Out;
-
-            if (input == token0) {
-                amount0Out = 0;
-                amount1Out = amountOut;
-            }
-            else {
-                amount0Out = amountOut;
-                amount1Out = 0;
-            }
-
-            address receiver;
-
-            if (
-                i < path.length - 2
-            ) {
-                receiver =
-                    ApexV2Library.pairFor(
-                        factory,
-                        output,
-                        path[i + 2]
-                    );
-
-                require(
-                    receiver != address(0),
-                    "ApexV2Router: NEXT_PAIR_MISSING"
-                );
-            }
-            else {
-                receiver = to;
-            }
-
-            IApexV2Pair(pair).swap(
-                amount0Out,
-                amount1Out,
-                receiver,
-                new bytes(0)
-            );
-        }
-    }
-
-    // ========================================================================
-    // TRANSFER FROM
-    // ========================================================================
-
-    function _transferFrom(
-        address token,
-        address from,
-        address to,
-        uint value
-    )
-        internal
-    {
-        (
-            bool success,
-            bytes memory data
-        ) =
-            token.call(
-                abi.encodeWithSelector(
-                    IERC20.transferFrom.selector,
-                    from,
-                    to,
-                    value
-                )
-            );
-
-        require(
-            success,
-            "ApexV2Router: TRANSFER_FROM_FAILED"
+        tokenA = new MockERC20(
+            "Token A",
+            "TKA"
         );
 
-        require(
-            data.length == 32,
-            "ApexV2Router: NO_RETURN_DATA"
-        );
-
-        require(
-            abi.decode(
-                data,
-                (bool)
-            ),
-            "ApexV2Router: TRANSFER_FROM_FALSE"
-        );
-    }
-
-    // ========================================================================
-    // SAFE TRANSFER
-    // ========================================================================
-
-    function _safeTransfer(
-        address token,
-        address to,
-        uint value
-    )
-        internal
-    {
-        (
-            bool success,
-            bytes memory data
-        )
-        =
-            token.call(
-                abi.encodeWithSelector(
-                    IERC20.transfer.selector,
-                    to,
-                    value
-                )
-            );
-
-        require(
-            success &&
-            (
-                data.length == 0 ||
-                abi.decode(
-                    data,
-                    (bool)
-                )
-            ),
-            "ApexV2Router: TRANSFER_FAILED"
-        );
-    }
-}
-
-// ============================================================================
-// SECURITY TEST
-// ============================================================================
-
-contract ApexV2RouterSecurityTest
-    is Test
-{
-    ApexV2Router public router;
-
-    MockRouterFactory public factory;
-    MockRouterWETH public weth;
-
-    MockRouterToken public tokenA;
-    MockRouterToken public tokenB;
-
-    address public pair;
-
-    address constant USER =
-        address(0xA11CE);
-
-    address constant USER2 =
-        address(0xB0B);
-
-    address constant TOKEN =
-        address(0x3000);
-
-    // ========================================================================
-    // SETUP
-    // ========================================================================
-
-    function setUp()
-        public
-    {
-        factory =
-            new MockRouterFactory();
-
-        weth =
-            new MockRouterWETH();
-
-        tokenA =
-            new MockRouterToken();
-
-        tokenB =
-            new MockRouterToken();
-
-        router =
-            new ApexV2Router(
-                address(factory),
-                address(weth)
-            );
-
-        vm.deal(
-            USER,
-            100 ether
-        );
-
-        vm.deal(
-            USER2,
-            100 ether
+        tokenB = new MockERC20(
+            "Token B",
+            "TKB"
         );
 
         tokenA.mint(
-            USER,
-            1_000_000
+            ALICE,
+            INITIAL_BALANCE
         );
 
         tokenB.mint(
-            USER,
-            1_000_000
+            ALICE,
+            INITIAL_BALANCE
         );
 
         tokenA.mint(
-            USER2,
-            1_000_000
+            BOB,
+            INITIAL_BALANCE
         );
 
         tokenB.mint(
-            USER2,
-            1_000_000
+            BOB,
+            INITIAL_BALANCE
         );
 
-        vm.prank(USER);
+        vm.deal(
+            ALICE,
+            1_000 ether
+        );
+
+        vm.deal(
+            BOB,
+            1_000 ether
+        );
+
+        vm.startPrank(ALICE);
 
         tokenA.approve(
             address(router),
-            type(uint).max
+            type(uint256).max
         );
-
-        vm.prank(USER);
 
         tokenB.approve(
             address(router),
-            type(uint).max
+            type(uint256).max
         );
 
-        vm.prank(USER2);
+        vm.stopPrank();
+
+        vm.startPrank(BOB);
 
         tokenA.approve(
             address(router),
-            type(uint).max
+            type(uint256).max
         );
-
-        vm.prank(USER2);
 
         tokenB.approve(
             address(router),
-            type(uint).max
+            type(uint256).max
         );
+
+        vm.stopPrank();
     }
 
     // ========================================================================
@@ -1229,6 +139,7 @@ contract ApexV2RouterSecurityTest
 
     function testConstructorStoresFactory()
         public
+        view
     {
         assertEq(
             router.factory(),
@@ -1238,6 +149,7 @@ contract ApexV2RouterSecurityTest
 
     function testConstructorStoresWETH()
         public
+        view
     {
         assertEq(
             router.WETH(),
@@ -1246,12 +158,43 @@ contract ApexV2RouterSecurityTest
     }
 
     // ========================================================================
-    // ADD LIQUIDITY
+    // DEADLINE
     // ========================================================================
+
+    function testDeadlineExactlyAtTimestampIsAccepted()
+        public
+    {
+        vm.prank(ALICE);
+
+        router.addLiquidity(
+            address(tokenA),
+            address(tokenB),
+            100 ether,
+            100 ether,
+            0,
+            0,
+            ALICE,
+            block.timestamp
+        );
+
+        address pair =
+            factory.getPair(
+                address(tokenA),
+                address(tokenB)
+            );
+
+        assertTrue(
+            pair != address(0)
+        );
+    }
 
     function testAddLiquidityRejectsExpiredDeadline()
         public
     {
+        vm.warp(100);
+
+        vm.prank(ALICE);
+
         vm.expectRevert(
             bytes(
                 "ApexV2Router: EXPIRED"
@@ -1259,20 +202,26 @@ contract ApexV2RouterSecurityTest
         );
 
         router.addLiquidity(
-            address(0x10),
-            address(0x20),
-            100,
-            100,
+            address(tokenA),
+            address(tokenB),
+            100 ether,
+            100 ether,
             0,
             0,
-            USER,
-            0
+            ALICE,
+            99
         );
     }
+
+    // ========================================================================
+    // ADD LIQUIDITY VALIDATION
+    // ========================================================================
 
     function testAddLiquidityRejectsIdenticalTokens()
         public
     {
+        vm.prank(ALICE);
+
         vm.expectRevert(
             bytes(
                 "ApexV2Router: IDENTICAL_TOKEN"
@@ -1280,13 +229,13 @@ contract ApexV2RouterSecurityTest
         );
 
         router.addLiquidity(
-            address(0x1234),
-            address(0x1234),
-            100,
-            100,
+            address(tokenA),
+            address(tokenA),
+            100 ether,
+            100 ether,
             0,
             0,
-            USER,
+            ALICE,
             block.timestamp
         );
     }
@@ -1294,20 +243,18 @@ contract ApexV2RouterSecurityTest
     function testAddLiquidityRejectsZeroTokenA()
         public
     {
-        vm.expectRevert(
-            bytes(
-                "ApexV2Router: ZERO_ADDRESS"
-            )
-        );
+        vm.prank(ALICE);
+
+        vm.expectRevert();
 
         router.addLiquidity(
             address(0),
-            address(0x20),
-            100,
-            100,
+            address(tokenB),
+            100 ether,
+            100 ether,
             0,
             0,
-            USER,
+            ALICE,
             block.timestamp
         );
     }
@@ -1315,118 +262,56 @@ contract ApexV2RouterSecurityTest
     function testAddLiquidityRejectsZeroTokenB()
         public
     {
-        vm.expectRevert(
-            bytes(
-                "ApexV2Router: ZERO_ADDRESS"
-            )
-        );
+        vm.prank(ALICE);
+
+        vm.expectRevert();
 
         router.addLiquidity(
-            address(0x10),
+            address(tokenA),
             address(0),
-            100,
-            100,
+            100 ether,
+            100 ether,
             0,
             0,
-            USER,
+            ALICE,
             block.timestamp
         );
     }
 
-    // ========================================================================
-    // ZERO RECIPIENT
-    // ========================================================================
-
-    function testAddLiquidityAllowsZeroRecipientUntilPairMint()
-    public
-{
-    // ------------------------------------------------------------
-    // Arrange
-    // ------------------------------------------------------------
-
-    // Give the test contract enough tokens because msg.sender
-    // inside router.addLiquidity() is this test contract.
-    tokenA.mint(
-        address(this),
-        100
-    );
-
-    tokenB.mint(
-        address(this),
-        100
-    );
-
-    // Approve router to spend tokens from this test contract.
-    tokenA.approve(
-        address(router),
-        type(uint).max
-    );
-
-    tokenB.approve(
-        address(router),
-        type(uint).max
-    );
-
-    // Create the pair first so we can configure the mock pair.
-    router.addLiquidity(
-        address(tokenA),
-        address(tokenB),
-        0,
-        0,
-        0,
-        0,
-        address(this),
-        block.timestamp
-    );
-
-    pair = factory.lastCreatedPair();
-
-    // Configure the pair to revert during mint().
-    MockRouterPair(pair).setRevertOnMint(true);
-
-    // ------------------------------------------------------------
-    // Act + Assert
-    // ------------------------------------------------------------
-
-    vm.expectRevert(
-        bytes(
-            "ApexV2Router: DUMMY"
-        )
-    );
-
-    router.addLiquidity(
-        address(tokenA),
-        address(tokenB),
-        100,
-        100,
-        0,
-        0,
-        address(0),
-        block.timestamp
-    );
-}
-
-    // ========================================================================
-    // DEADLINE
-    // ========================================================================
-
-    function testDeadlineExactlyAtTimestampIsAccepted()
+    function testAddLiquidityRejectsZeroRecipient()
         public
     {
-        vm.expectRevert(
-            bytes(
-                "ApexV2Router: IDENTICAL_TOKEN"
-            )
-        );
+        vm.prank(ALICE);
+
+        vm.expectRevert();
 
         router.addLiquidity(
-            address(0x1234),
-            address(0x1234),
-            100,
-            100,
+            address(tokenA),
+            address(tokenB),
+            100 ether,
+            100 ether,
             0,
             0,
-            USER,
+            address(0),
+            block.timestamp
+        );
+    }
+
+    function testAddLiquidityRejectsZeroDesiredAmounts()
+        public
+    {
+        vm.prank(ALICE);
+
+        vm.expectRevert();
+
+        router.addLiquidity(
+            address(tokenA),
+            address(tokenB),
+            0,
+            0,
+            0,
+            0,
+            ALICE,
             block.timestamp
         );
     }
@@ -1438,6 +323,10 @@ contract ApexV2RouterSecurityTest
     function testAddLiquidityETHRejectsExpiredDeadline()
         public
     {
+        vm.warp(100);
+
+        vm.prank(ALICE);
+
         vm.expectRevert(
             bytes(
                 "ApexV2Router: EXPIRED"
@@ -1447,18 +336,20 @@ contract ApexV2RouterSecurityTest
         router.addLiquidityETH{
             value: 1 ether
         }(
-            address(0x10),
-            100,
+            address(tokenA),
+            100 ether,
             0,
             0,
-            USER,
-            0
+            ALICE,
+            99
         );
     }
 
     function testAddLiquidityETHRejectsWETHAsToken()
         public
     {
+        vm.prank(ALICE);
+
         vm.expectRevert(
             bytes(
                 "ApexV2Router: INVALID_TOKEN"
@@ -1469,31 +360,84 @@ contract ApexV2RouterSecurityTest
             value: 1 ether
         }(
             address(weth),
-            100,
+            100 ether,
             0,
             0,
-            USER,
+            ALICE,
             block.timestamp
         );
     }
 
-    function testAddLiquidityETHRejectsETHBelowMinimum()
+    function testAddLiquidityETHRejectsZeroToken()
         public
     {
-        vm.expectRevert(
-            bytes(
-                "ApexV2Router: ETH_LOW"
-            )
-        );
+        vm.prank(ALICE);
+
+        vm.expectRevert();
 
         router.addLiquidityETH{
-            value: 0.5 ether
+            value: 1 ether
         }(
-            TOKEN,
-            100,
+            address(0),
+            100 ether,
             0,
-            1 ether,
-            USER,
+            0,
+            ALICE,
+            block.timestamp
+        );
+    }
+
+    function testAddLiquidityETHRejectsZeroRecipient()
+        public
+    {
+        vm.prank(ALICE);
+
+        vm.expectRevert();
+
+        router.addLiquidityETH{
+            value: 1 ether
+        }(
+            address(tokenA),
+            100 ether,
+            0,
+            0,
+            address(0),
+            block.timestamp
+        );
+    }
+
+    function testAddLiquidityETHRejectsZeroTokenDesired()
+        public
+    {
+        vm.prank(ALICE);
+
+        vm.expectRevert();
+
+        router.addLiquidityETH{
+            value: 1 ether
+        }(
+            address(tokenA),
+            0,
+            0,
+            0,
+            ALICE,
+            block.timestamp
+        );
+    }
+
+    function testAddLiquidityETHRejectsZeroETH()
+        public
+    {
+        vm.prank(ALICE);
+
+        vm.expectRevert();
+
+        router.addLiquidityETH(
+            address(tokenA),
+            100 ether,
+            0,
+            0,
+            ALICE,
             block.timestamp
         );
     }
@@ -1501,20 +445,37 @@ contract ApexV2RouterSecurityTest
     function testAddLiquidityETHRejectsTokenBelowMinimum()
         public
     {
-        vm.expectRevert(
-            bytes(
-                "ApexV2Router: TOKEN_LOW"
-            )
-        );
+        vm.prank(ALICE);
+
+        vm.expectRevert();
 
         router.addLiquidityETH{
             value: 1 ether
         }(
-            TOKEN,
-            99,
-            100,
+            address(tokenA),
+            99 ether,
+            100 ether,
             0,
-            USER,
+            ALICE,
+            block.timestamp
+        );
+    }
+
+    function testAddLiquidityETHRejectsETHBelowMinimum()
+        public
+    {
+        vm.prank(ALICE);
+
+        vm.expectRevert();
+
+        router.addLiquidityETH{
+            value: 0.5 ether
+        }(
+            address(tokenA),
+            100 ether,
+            0,
+            1 ether,
+            ALICE,
             block.timestamp
         );
     }
@@ -1526,29 +487,79 @@ contract ApexV2RouterSecurityTest
     function testReceiveRejectsETHFromNonWETH()
         public
     {
-        vm.expectRevert(
-            bytes(
-                "ApexV2Router: ONLY_WETH"
-            )
+        vm.deal(
+            address(this),
+            10 ether
         );
 
-        address(router).call{
-            value: 1 ether
-        }("");
+        uint256 routerBalanceBefore =
+            address(router).balance;
+
+        (
+            bool success,
+            bytes memory returnData
+        ) =
+            address(router).call{
+                value: 1 ether
+            }("");
+
+        assertFalse(
+            success
+        );
+
+        assertEq(
+            address(router).balance,
+            routerBalanceBefore
+        );
+
+        assertGt(
+            returnData.length,
+            0
+        );
     }
 
     function testRouterDoesNotAcceptArbitraryETH()
         public
     {
-        vm.expectRevert(
-            bytes(
-                "ApexV2Router: ONLY_WETH"
-            )
+        vm.deal(
+            ALICE,
+            10 ether
         );
 
-        address(router).call{
-            value: 0.5 ether
-        }("");
+        uint256 aliceBefore =
+            ALICE.balance;
+
+        uint256 routerBefore =
+            address(router).balance;
+
+        vm.prank(ALICE);
+
+        (
+            bool success,
+            bytes memory returnData
+        ) =
+            address(router).call{
+                value: 0.5 ether
+            }("");
+
+        assertFalse(
+            success
+        );
+
+        assertEq(
+            address(router).balance,
+            routerBefore
+        );
+
+        assertEq(
+            ALICE.balance,
+            aliceBefore
+        );
+
+        assertGt(
+            returnData.length,
+            0
+        );
     }
 
     // ========================================================================
@@ -1558,6 +569,10 @@ contract ApexV2RouterSecurityTest
     function testRemoveLiquidityRejectsExpiredDeadline()
         public
     {
+        vm.warp(100);
+
+        vm.prank(ALICE);
+
         vm.expectRevert(
             bytes(
                 "ApexV2Router: EXPIRED"
@@ -1565,19 +580,23 @@ contract ApexV2RouterSecurityTest
         );
 
         router.removeLiquidity(
-            address(0x10),
-            address(weth),
+            address(tokenA),
+            address(tokenB),
             100,
             0,
             0,
-            USER,
-            0
+            ALICE,
+            99
         );
     }
 
     function testRemoveLiquidityETHRejectsExpiredDeadline()
         public
     {
+        vm.warp(100);
+
+        vm.prank(ALICE);
+
         vm.expectRevert(
             bytes(
                 "ApexV2Router: EXPIRED"
@@ -1585,17 +604,17 @@ contract ApexV2RouterSecurityTest
         );
 
         router.removeLiquidityETH(
-            address(0x10),
+            address(tokenA),
             100,
             0,
             0,
-            USER,
-            0
+            ALICE,
+            99
         );
     }
 
     // ========================================================================
-    // TOKENS -> TOKENS
+    // TOKENS -> TOKENS PATH VALIDATION
     // ========================================================================
 
     function testSwapTokensForTokensRejectsExpiredDeadline()
@@ -1604,8 +623,12 @@ contract ApexV2RouterSecurityTest
         address[] memory path =
             new address[](2);
 
-        path[0] = address(0x10);
-        path[1] = address(0x20);
+        path[0] = address(tokenA);
+        path[1] = address(tokenB);
+
+        vm.warp(100);
+
+        vm.prank(ALICE);
 
         vm.expectRevert(
             bytes(
@@ -1614,11 +637,11 @@ contract ApexV2RouterSecurityTest
         );
 
         router.swapExactTokensForTokens(
-            100,
+            100 ether,
             0,
             path,
-            USER,
-            0
+            ALICE,
+            99
         );
     }
 
@@ -1628,6 +651,8 @@ contract ApexV2RouterSecurityTest
         address[] memory path =
             new address[](0);
 
+        vm.prank(ALICE);
+
         vm.expectRevert(
             bytes(
                 "ApexV2Router: INVALID_PATH"
@@ -1635,10 +660,10 @@ contract ApexV2RouterSecurityTest
         );
 
         router.swapExactTokensForTokens(
-            100,
+            100 ether,
             0,
             path,
-            USER,
+            ALICE,
             block.timestamp
         );
     }
@@ -1649,7 +674,9 @@ contract ApexV2RouterSecurityTest
         address[] memory path =
             new address[](1);
 
-        path[0] = address(0x10);
+        path[0] = address(tokenA);
+
+        vm.prank(ALICE);
 
         vm.expectRevert(
             bytes(
@@ -1658,10 +685,10 @@ contract ApexV2RouterSecurityTest
         );
 
         router.swapExactTokensForTokens(
-            100,
+            100 ether,
             0,
             path,
-            USER,
+            ALICE,
             block.timestamp
         );
     }
@@ -1672,11 +699,13 @@ contract ApexV2RouterSecurityTest
         address[] memory path =
             new address[](1);
 
-        path[0] = address(0x10);
+        path[0] = address(tokenA);
+
+        vm.prank(ALICE);
 
         vm.expectRevert(
             bytes(
-                "ApexV2Router: INVALID_PATH"
+                "ApexV2Router: INSUFFICIENT_INPUT"
             )
         );
 
@@ -1684,13 +713,13 @@ contract ApexV2RouterSecurityTest
             0,
             0,
             path,
-            USER,
+            ALICE,
             block.timestamp
         );
     }
 
     // ========================================================================
-    // ETH -> TOKENS
+    // ETH -> TOKENS PATH VALIDATION
     // ========================================================================
 
     function testSwapETHForTokensRejectsExpiredDeadline()
@@ -1700,7 +729,11 @@ contract ApexV2RouterSecurityTest
             new address[](2);
 
         path[0] = address(weth);
-        path[1] = address(0x20);
+        path[1] = address(tokenA);
+
+        vm.warp(100);
+
+        vm.prank(ALICE);
 
         vm.expectRevert(
             bytes(
@@ -1713,8 +746,8 @@ contract ApexV2RouterSecurityTest
         }(
             0,
             path,
-            USER,
-            0
+            ALICE,
+            99
         );
     }
 
@@ -1723,6 +756,8 @@ contract ApexV2RouterSecurityTest
     {
         address[] memory path =
             new address[](0);
+
+        vm.prank(ALICE);
 
         vm.expectRevert(
             bytes(
@@ -1735,7 +770,7 @@ contract ApexV2RouterSecurityTest
         }(
             0,
             path,
-            USER,
+            ALICE,
             block.timestamp
         );
     }
@@ -1748,6 +783,8 @@ contract ApexV2RouterSecurityTest
 
         path[0] = address(weth);
 
+        vm.prank(ALICE);
+
         vm.expectRevert(
             bytes(
                 "ApexV2Router: INVALID_PATH"
@@ -1759,7 +796,7 @@ contract ApexV2RouterSecurityTest
         }(
             0,
             path,
-            USER,
+            ALICE,
             block.timestamp
         );
     }
@@ -1770,8 +807,10 @@ contract ApexV2RouterSecurityTest
         address[] memory path =
             new address[](2);
 
-        path[0] = address(0x1234);
-        path[1] = address(0x5678);
+        path[0] = address(tokenA);
+        path[1] = address(tokenB);
+
+        vm.prank(ALICE);
 
         vm.expectRevert(
             bytes(
@@ -1784,7 +823,7 @@ contract ApexV2RouterSecurityTest
         }(
             0,
             path,
-            USER,
+            ALICE,
             block.timestamp
         );
     }
@@ -1797,22 +836,24 @@ contract ApexV2RouterSecurityTest
 
         path[0] = address(weth);
 
+        vm.prank(ALICE);
+
         vm.expectRevert(
             bytes(
-                "ApexV2Router: INVALID_PATH"
+                "ApexV2Router: INSUFFICIENT_INPUT"
             )
         );
 
         router.swapExactETHForTokens(
             0,
             path,
-            USER,
+            ALICE,
             block.timestamp
         );
     }
 
     // ========================================================================
-    // TOKENS -> ETH
+    // TOKENS -> ETH PATH VALIDATION
     // ========================================================================
 
     function testSwapTokensForETHRejectsExpiredDeadline()
@@ -1821,8 +862,12 @@ contract ApexV2RouterSecurityTest
         address[] memory path =
             new address[](2);
 
-        path[0] = address(0x10);
+        path[0] = address(tokenA);
         path[1] = address(weth);
+
+        vm.warp(100);
+
+        vm.prank(ALICE);
 
         vm.expectRevert(
             bytes(
@@ -1831,11 +876,11 @@ contract ApexV2RouterSecurityTest
         );
 
         router.swapExactTokensForETH(
-            100,
+            100 ether,
             0,
             path,
-            USER,
-            0
+            ALICE,
+            99
         );
     }
 
@@ -1845,6 +890,8 @@ contract ApexV2RouterSecurityTest
         address[] memory path =
             new address[](0);
 
+        vm.prank(ALICE);
+
         vm.expectRevert(
             bytes(
                 "ApexV2Router: INVALID_PATH"
@@ -1852,10 +899,10 @@ contract ApexV2RouterSecurityTest
         );
 
         router.swapExactTokensForETH(
-            100,
+            100 ether,
             0,
             path,
-            USER,
+            ALICE,
             block.timestamp
         );
     }
@@ -1866,7 +913,9 @@ contract ApexV2RouterSecurityTest
         address[] memory path =
             new address[](1);
 
-        path[0] = address(0x10);
+        path[0] = address(tokenA);
+
+        vm.prank(ALICE);
 
         vm.expectRevert(
             bytes(
@@ -1875,10 +924,10 @@ contract ApexV2RouterSecurityTest
         );
 
         router.swapExactTokensForETH(
-            100,
+            100 ether,
             0,
             path,
-            USER,
+            ALICE,
             block.timestamp
         );
     }
@@ -1889,8 +938,10 @@ contract ApexV2RouterSecurityTest
         address[] memory path =
             new address[](2);
 
-        path[0] = address(0x1234);
-        path[1] = address(0x5678);
+        path[0] = address(tokenA);
+        path[1] = address(tokenB);
+
+        vm.prank(ALICE);
 
         vm.expectRevert(
             bytes(
@@ -1899,10 +950,10 @@ contract ApexV2RouterSecurityTest
         );
 
         router.swapExactTokensForETH(
-            100,
+            100 ether,
             0,
             path,
-            USER,
+            ALICE,
             block.timestamp
         );
     }

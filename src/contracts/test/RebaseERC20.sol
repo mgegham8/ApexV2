@@ -2,109 +2,110 @@
 pragma solidity 0.8.28;
 
 contract RebaseERC20 {
-
     string public name;
     string public symbol;
 
-    uint8 public decimals = 18;
+    uint8 public constant decimals = 18;
 
+    uint256 internal constant BASE = 1e18;
 
-    uint internal constant BASE = 1e18;
+    uint256 public totalShares;
+    uint256 public multiplier = BASE;
 
+    mapping(address => uint256)
+        internal shares;
 
-    uint public totalShares;
-
-    uint public multiplier = BASE;
-
-
-    mapping(address => uint) internal shares;
-
-
-    mapping(address => mapping(address => uint))
+    mapping(address => mapping(address => uint256))
         public allowance;
-
-
 
     event Transfer(
         address indexed from,
         address indexed to,
-        uint value
+        uint256 value
     );
-
 
     event Approval(
         address indexed owner,
         address indexed spender,
-        uint value
+        uint256 value
     );
 
-
+    event Rebased(
+        uint256 oldMultiplier,
+        uint256 newMultiplier
+    );
 
     constructor(
         string memory _name,
         string memory _symbol
-    )
-    {
-        name = _name;
-        symbol = _symbol;
+    ) {
+        name =
+            _name;
+
+        symbol =
+            _symbol;
     }
-
-
-
 
     function totalSupply()
         public
         view
-        returns(uint)
+        returns (uint256)
     {
         return
-            totalShares
-            *
-            multiplier
-            /
+            totalShares *
+            multiplier /
             BASE;
     }
-
-
-
 
     function balanceOf(
         address user
     )
         public
         view
-        returns(uint)
+        returns (uint256)
     {
         return
-            shares[user]
-            *
-            multiplier
-            /
+            shares[user] *
+            multiplier /
             BASE;
     }
 
-
-
+    function shareBalanceOf(
+        address user
+    )
+        external
+        view
+        returns (uint256)
+    {
+        return shares[user];
+    }
 
     function mint(
         address to,
-        uint amount
+        uint256 amount
     )
         external
     {
+        require(
+            to != address(0),
+            "ZERO_ADDRESS"
+        );
 
-        uint shareAmount =
-            amount
-            *
-            BASE
-            /
+        uint256 shareAmount =
+            amount *
+            BASE /
             multiplier;
 
+        require(
+            shareAmount != 0 || amount == 0,
+            "AMOUNT_TOO_SMALL"
+        );
 
-        shares[to] += shareAmount;
+        shares[to] +=
+            shareAmount;
 
-        totalShares += shareAmount;
-
+        totalShares +=
+            shareAmount;
 
         emit Transfer(
             address(0),
@@ -113,64 +114,31 @@ contract RebaseERC20 {
         );
     }
 
-
-
-
     function transfer(
         address to,
-        uint amount
+        uint256 amount
     )
         external
-        returns(bool)
+        returns (bool)
     {
-
-        uint shareAmount =
-            amount
-            *
-            BASE
-            /
-            multiplier;
-
-
-        require(
-            shares[msg.sender] >= shareAmount,
-            "BALANCE"
-        );
-
-
-        shares[msg.sender]
-            -= shareAmount;
-
-
-        shares[to]
-            += shareAmount;
-
-
-        emit Transfer(
+        _transfer(
             msg.sender,
             to,
             amount
         );
 
-
         return true;
     }
 
-
-
-
-
     function approve(
         address spender,
-        uint amount
+        uint256 amount
     )
         external
-        returns(bool)
+        returns (bool)
     {
-
-        allowance[msg.sender][spender]
-            = amount;
-
+        allowance[msg.sender][spender] =
+            amount;
 
         emit Approval(
             msg.sender,
@@ -178,95 +146,112 @@ contract RebaseERC20 {
             amount
         );
 
-
         return true;
     }
-
-
-
-
 
     function transferFrom(
         address from,
         address to,
-        uint amount
+        uint256 amount
     )
         external
-        returns(bool)
+        returns (bool)
     {
-
-        uint allowed =
+        uint256 allowed =
             allowance[from][msg.sender];
-
 
         require(
             allowed >= amount,
             "ALLOWANCE"
         );
 
+        if (
+            allowed !=
+            type(uint256).max
+        ) {
+            unchecked {
+                allowance[from][msg.sender] =
+                    allowed - amount;
+            }
 
-        if(
-            allowed != type(uint).max
-        )
-        {
-            allowance[from][msg.sender]
-                =
-                allowed - amount;
+            emit Approval(
+                from,
+                msg.sender,
+                allowance[from][msg.sender]
+            );
         }
 
-
-
-        uint shareAmount =
+        _transfer(
+            from,
+            to,
             amount
-            *
-            BASE
-            /
+        );
+
+        return true;
+    }
+
+    function rebase(
+        uint256 newMultiplier
+    )
+        external
+    {
+        require(
+            newMultiplier != 0,
+            "ZERO"
+        );
+
+        uint256 oldMultiplier =
             multiplier;
 
+        multiplier =
+            newMultiplier;
 
+        emit Rebased(
+            oldMultiplier,
+            newMultiplier
+        );
+    }
+
+    function _transfer(
+        address from,
+        address to,
+        uint256 amount
+    )
+        internal
+    {
+        require(
+            to != address(0),
+            "ZERO_ADDRESS"
+        );
+
+        uint256 shareAmount =
+            amount *
+            BASE /
+            multiplier;
 
         require(
-            shares[from] >= shareAmount,
+            shareAmount != 0 || amount == 0,
+            "AMOUNT_TOO_SMALL"
+        );
+
+        require(
+            shares[from] >=
+                shareAmount,
             "BALANCE"
         );
 
+        unchecked {
+            shares[from] -=
+                shareAmount;
+        }
 
-        shares[from]
-            -= shareAmount;
-
-
-        shares[to]
-            += shareAmount;
-
-
+        shares[to] +=
+            shareAmount;
 
         emit Transfer(
             from,
             to,
             amount
         );
-
-
-        return true;
     }
-
-
-
-
-
-    function rebase(
-        uint newMultiplier
-    )
-        external
-    {
-
-        require(
-            newMultiplier > 0,
-            "ZERO"
-        );
-
-
-        multiplier = newMultiplier;
-    }
-
 }

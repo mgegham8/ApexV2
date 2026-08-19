@@ -2,6 +2,47 @@
 pragma solidity 0.8.28;
 
 library SafeTransfer {
+    error TransferFailed();
+    error TransferFromFailed();
+    error TokenHasNoCode();
+
+    bytes4 private constant TRANSFER_SELECTOR =
+        0xa9059cbb;
+
+    bytes4 private constant TRANSFER_FROM_SELECTOR =
+        0x23b872dd;
+
+    function safeTransfer(
+        address token,
+        address to,
+        uint256 value
+    )
+        internal
+    {
+        if (token.code.length == 0) {
+            revert TokenHasNoCode();
+        }
+
+        (
+            bool success,
+            bytes memory data
+        ) =
+            token.call(
+                abi.encodeWithSelector(
+                    TRANSFER_SELECTOR,
+                    to,
+                    value
+                )
+            );
+
+        if (!success) {
+            revert TransferFailed();
+        }
+
+        if (!_isSuccessfulReturnData(data)) {
+            revert TransferFailed();
+        }
+    }
 
     function safeTransferFrom(
         address token,
@@ -11,45 +52,55 @@ library SafeTransfer {
     )
         internal
     {
-        (bool success, bytes memory data) =
+        if (token.code.length == 0) {
+            revert TokenHasNoCode();
+        }
+
+        (
+            bool success,
+            bytes memory data
+        ) =
             token.call(
                 abi.encodeWithSelector(
-                    0x23b872dd,
+                    TRANSFER_FROM_SELECTOR,
                     from,
                     to,
                     value
                 )
             );
 
-        require(success, "TRANSFER_FROM_FAILED");
+        if (!success) {
+            revert TransferFromFailed();
+        }
 
-        require(
-            data.length == 0 || (data.length == 32 && abi.decode(data, (bool))),
-            "TRANSFER_FROM_FAILED"
-        );
+        if (!_isSuccessfulReturnData(data)) {
+            revert TransferFromFailed();
+        }
     }
 
-    function safeTransfer(
-        address token,
-        address to,
-        uint256 value
+    function _isSuccessfulReturnData(
+        bytes memory data
     )
-        internal
+        private
+        pure
+        returns (bool)
     {
-        (bool success, bytes memory data) =
-            token.call(
-                abi.encodeWithSelector(
-                    0xa9059cbb,
-                    to,
-                    value
-                )
-            );
+        if (data.length == 0) {
+            return true;
+        }
 
-        require(success, "TRANSFER_FAILED");
+        if (data.length != 32) {
+            return false;
+        }
 
-        require(
-            data.length == 0 || (data.length == 32 && abi.decode(data, (bool))),
-            "TRANSFER_FAILED"
-        );
+        uint256 result;
+
+        assembly ("memory-safe") {
+            result := mload(
+                add(data, 0x20)
+            )
+        }
+
+        return result == 1;
     }
 }

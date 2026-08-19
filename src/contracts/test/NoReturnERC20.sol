@@ -1,185 +1,184 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
-
+pragma solidity 0.8.28;
 
 contract NoReturnERC20 {
+    string public name =
+        "NoReturn Token";
 
+    string public symbol =
+        "NRT";
 
-    string public name = "NoReturn Token";
-    string public symbol = "NRT";
+    uint8 public constant decimals =
+        18;
 
-    uint8 public decimals = 18;
+    uint256 public totalSupply;
 
+    mapping(address => uint256)
+        public balanceOf;
 
-    uint public totalSupply;
+    mapping(address => mapping(address => uint256))
+        public allowance;
 
+    event Transfer(
+        address indexed from,
+        address indexed to,
+        uint256 value
+    );
 
+    event Approval(
+        address indexed owner,
+        address indexed spender,
+        uint256 value
+    );
 
-    mapping(address => uint)
-    public balanceOf;
-
-
-
-    mapping(address => mapping(address => uint))
-    public allowance;
-
-
-
-
-
-    constructor()
-    {
+    constructor() {
         _mint(
             msg.sender,
-            1000000 ether
+            1_000_000 ether
         );
     }
 
-
-
-
-
-
-
-    function _mint(
-        address to,
-        uint amount
-    )
-    internal
-    {
-
-        balanceOf[to] += amount;
-
-        totalSupply += amount;
-
-    }
-
-
-
-
-
-
-
-
-
     function mint(
         address to,
-        uint amount
+        uint256 amount
     )
-    external
+        external
     {
-
         _mint(
             to,
             amount
         );
-
     }
-
-
-
-
-
-
-
-
 
     function approve(
         address spender,
-        uint amount
+        uint256 amount
     )
-    external
+        external
     {
+        allowance[msg.sender][spender] =
+            amount;
 
-        allowance[msg.sender][spender]
-        =
-        amount;
+        emit Approval(
+            msg.sender,
+            spender,
+            amount
+        );
 
-
-        // NO RETURN
-
+        // Intentionally no return value.
     }
-
-
-
-
-
-
-
-
 
     function transfer(
         address to,
-        uint amount
+        uint256 amount
     )
-    external
+        external
     {
-
-        require(
-            balanceOf[msg.sender] >= amount,
-            "balance"
+        _transfer(
+            msg.sender,
+            to,
+            amount
         );
 
-
-        balanceOf[msg.sender]
-        -= amount;
-
-
-        balanceOf[to]
-        += amount;
-
-
-        // intentionally no return
-
+        // Intentionally no return value.
     }
-
-
-
-
-
-
-
-
 
     function transferFrom(
         address from,
         address to,
-        uint amount
+        uint256 amount
     )
-    external
+        external
     {
+        uint256 allowed =
+            allowance[from][msg.sender];
 
         require(
-            balanceOf[from] >= amount,
-            "balance"
+            allowed >= amount,
+            "ALLOWANCE_LOW"
         );
 
+        if (
+            allowed !=
+            type(uint256).max
+        ) {
+            unchecked {
+                allowance[from][msg.sender] =
+                    allowed - amount;
+            }
 
-        require(
-            allowance[from][msg.sender] >= amount,
-            "allowance"
+            emit Approval(
+                from,
+                msg.sender,
+                allowance[from][msg.sender]
+            );
+        }
+
+        _transfer(
+            from,
+            to,
+            amount
         );
 
-
-
-        allowance[from][msg.sender]
-        -= amount;
-
-
-
-        balanceOf[from]
-        -= amount;
-
-
-        balanceOf[to]
-        += amount;
-
-
-
-        // intentionally no return
-
+        // Intentionally no return value.
     }
 
+    function _mint(
+        address to,
+        uint256 amount
+    )
+        internal
+    {
+        require(
+            to != address(0),
+            "ZERO_ADDRESS"
+        );
 
+        totalSupply +=
+            amount;
 
+        balanceOf[to] +=
+            amount;
+
+        emit Transfer(
+            address(0),
+            to,
+            amount
+        );
+    }
+
+    function _transfer(
+        address from,
+        address to,
+        uint256 amount
+    )
+        internal
+    {
+        require(
+            to != address(0),
+            "ZERO_ADDRESS"
+        );
+
+        uint256 balance =
+            balanceOf[from];
+
+        require(
+            balance >= amount,
+            "BALANCE_LOW"
+        );
+
+        unchecked {
+            balanceOf[from] =
+                balance - amount;
+        }
+
+        balanceOf[to] +=
+            amount;
+
+        emit Transfer(
+            from,
+            to,
+            amount
+        );
+    }
 }

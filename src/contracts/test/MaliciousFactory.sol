@@ -1,49 +1,35 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
-
-
-interface IFakePair {
-    function mint(address to) external returns(uint);
-}
-
+pragma solidity 0.8.28;
 
 contract MaliciousFactory {
-
-
-    address public fakePair;
-
+    address public immutable fakePair;
 
     constructor(
         address _fakePair
-    ){
-        fakePair = _fakePair;
+    ) {
+        fakePair =
+            _fakePair;
     }
-
-
 
     function getPair(
         address,
         address
     )
-    external
-    view
-    returns(address)
+        external
+        view
+        returns (address)
     {
         return fakePair;
     }
-
-
-
 
     function createPair(
         address,
         address
     )
-    external
-    view
-    returns(address)
+        external
+        view
+        returns (address)
     {
         return fakePair;
     }
-
 }

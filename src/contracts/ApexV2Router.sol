@@ -11,7 +11,7 @@ contract ApexV2Router {
     address public immutable factory;
     address public immutable WETH;
 
-    modifier ensure(uint deadline) {
+    modifier ensure(uint256 deadline) {
         require(
             deadline >= block.timestamp,
             "ApexV2Router: EXPIRED"
@@ -37,6 +37,10 @@ contract ApexV2Router {
         WETH = _WETH;
     }
 
+    // ============================================================
+    // RECEIVE
+    // ============================================================
+
     receive() external payable {
         require(
             msg.sender == WETH,
@@ -51,19 +55,19 @@ contract ApexV2Router {
     function addLiquidity(
         address tokenA,
         address tokenB,
-        uint amountADesired,
-        uint amountBDesired,
-        uint amountAMin,
-        uint amountBMin,
+        uint256 amountADesired,
+        uint256 amountBDesired,
+        uint256 amountAMin,
+        uint256 amountBMin,
         address to,
-        uint deadline
+        uint256 deadline
     )
         external
         ensure(deadline)
         returns (
-            uint amountA,
-            uint amountB,
-            uint liquidity
+            uint256 amountA,
+            uint256 amountB,
+            uint256 liquidity
         )
     {
         require(
@@ -75,6 +79,21 @@ contract ApexV2Router {
             tokenA != address(0) &&
             tokenB != address(0),
             "ApexV2Router: ZERO_ADDRESS"
+        );
+
+        require(
+            to != address(0),
+            "ApexV2Router: ZERO_RECIPIENT"
+        );
+
+        require(
+            amountADesired > 0,
+            "ApexV2Router: A_ZERO"
+        );
+
+        require(
+            amountBDesired > 0,
+            "ApexV2Router: B_ZERO"
         );
 
         address pair =
@@ -92,8 +111,8 @@ contract ApexV2Router {
         }
 
         (
-            uint reserveA,
-            uint reserveB
+            uint256 reserveA,
+            uint256 reserveB
         ) =
             ApexV2Library.getReserves(
                 factory,
@@ -107,16 +126,39 @@ contract ApexV2Router {
         ) {
             amountA = amountADesired;
             amountB = amountBDesired;
+
+            require(
+                amountA >= amountAMin,
+                "ApexV2Router: A_LOW"
+            );
+
+            require(
+                amountB >= amountBMin,
+                "ApexV2Router: B_LOW"
+            );
         }
         else {
-            uint amountBOptimal =
+            require(
+                reserveA > 0 &&
+                reserveB > 0,
+                "ApexV2Router: INVALID_RESERVES"
+            );
+
+            uint256 amountBOptimal =
                 ApexV2Library.quote(
                     amountADesired,
                     reserveA,
                     reserveB
                 );
 
-            if (amountBOptimal <= amountBDesired) {
+            if (
+                amountBOptimal <= amountBDesired
+            ) {
+                require(
+                    amountADesired >= amountAMin,
+                    "ApexV2Router: A_LOW"
+                );
+
                 require(
                     amountBOptimal >= amountBMin,
                     "ApexV2Router: B_LOW"
@@ -126,7 +168,7 @@ contract ApexV2Router {
                 amountB = amountBOptimal;
             }
             else {
-                uint amountAOptimal =
+                uint256 amountAOptimal =
                     ApexV2Library.quote(
                         amountBDesired,
                         reserveB,
@@ -143,19 +185,34 @@ contract ApexV2Router {
                     "ApexV2Router: A_LOW"
                 );
 
+                require(
+                    amountBDesired >= amountBMin,
+                    "ApexV2Router: B_LOW"
+                );
+
                 amountA = amountAOptimal;
                 amountB = amountBDesired;
             }
         }
 
-        _transferFrom(
+        require(
+            amountA > 0,
+            "ApexV2Router: A_ZERO"
+        );
+
+        require(
+            amountB > 0,
+            "ApexV2Router: B_ZERO"
+        );
+
+        _safeTransferFrom(
             tokenA,
             msg.sender,
             pair,
             amountA
         );
 
-        _transferFrom(
+        _safeTransferFrom(
             tokenB,
             msg.sender,
             pair,
@@ -164,6 +221,11 @@ contract ApexV2Router {
 
         liquidity =
             IApexV2Pair(pair).mint(to);
+
+        require(
+            liquidity > 0,
+            "ApexV2Router: INSUFFICIENT_LIQUIDITY_MINTED"
+        );
     }
 
     // ============================================================
@@ -172,37 +234,44 @@ contract ApexV2Router {
 
     function addLiquidityETH(
         address token,
-        uint amountTokenDesired,
-        uint amountTokenMin,
-        uint amountETHMin,
+        uint256 amountTokenDesired,
+        uint256 amountTokenMin,
+        uint256 amountETHMin,
         address to,
-        uint deadline
+        uint256 deadline
     )
         external
         payable
         ensure(deadline)
         returns (
-            uint amountToken,
-            uint amountETH,
-            uint liquidity
+            uint256 amountToken,
+            uint256 amountETH,
+            uint256 liquidity
         )
     {
+        require(
+            token != address(0),
+            "ApexV2Router: ZERO_ADDRESS"
+        );
+
         require(
             token != WETH,
             "ApexV2Router: INVALID_TOKEN"
         );
 
-        amountToken = amountTokenDesired;
-        amountETH = msg.value;
-
         require(
-            amountToken >= amountTokenMin,
-            "ApexV2Router: TOKEN_LOW"
+            to != address(0),
+            "ApexV2Router: ZERO_RECIPIENT"
         );
 
         require(
-            amountETH >= amountETHMin,
-            "ApexV2Router: ETH_LOW"
+            amountTokenDesired > 0,
+            "ApexV2Router: TOKEN_ZERO"
+        );
+
+        require(
+            msg.value > 0,
+            "ApexV2Router: ETH_ZERO"
         );
 
         address pair =
@@ -219,7 +288,102 @@ contract ApexV2Router {
                 );
         }
 
-        _transferFrom(
+        (
+            uint256 reserveToken,
+            uint256 reserveETH
+        ) =
+            ApexV2Library.getReserves(
+                factory,
+                token,
+                WETH
+            );
+
+        if (
+            reserveToken == 0 &&
+            reserveETH == 0
+        ) {
+            amountToken = amountTokenDesired;
+            amountETH = msg.value;
+
+            require(
+                amountToken >= amountTokenMin,
+                "ApexV2Router: TOKEN_LOW"
+            );
+
+            require(
+                amountETH >= amountETHMin,
+                "ApexV2Router: ETH_LOW"
+            );
+        }
+        else {
+            require(
+                reserveToken > 0 &&
+                reserveETH > 0,
+                "ApexV2Router: INVALID_RESERVES"
+            );
+
+            uint256 amountETHOptimal =
+                ApexV2Library.quote(
+                    amountTokenDesired,
+                    reserveToken,
+                    reserveETH
+                );
+
+            if (
+                amountETHOptimal <= msg.value
+            ) {
+                require(
+                    amountTokenDesired >= amountTokenMin,
+                    "ApexV2Router: TOKEN_LOW"
+                );
+
+                require(
+                    amountETHOptimal >= amountETHMin,
+                    "ApexV2Router: ETH_LOW"
+                );
+
+                amountToken = amountTokenDesired;
+                amountETH = amountETHOptimal;
+            }
+            else {
+                uint256 amountTokenOptimal =
+                    ApexV2Library.quote(
+                        msg.value,
+                        reserveETH,
+                        reserveToken
+                    );
+
+                require(
+                    amountTokenOptimal <= amountTokenDesired,
+                    "ApexV2Router: TOKEN_HIGH"
+                );
+
+                require(
+                    amountTokenOptimal >= amountTokenMin,
+                    "ApexV2Router: TOKEN_LOW"
+                );
+
+                require(
+                    msg.value >= amountETHMin,
+                    "ApexV2Router: ETH_LOW"
+                );
+
+                amountToken = amountTokenOptimal;
+                amountETH = msg.value;
+            }
+        }
+
+        require(
+            amountToken > 0,
+            "ApexV2Router: TOKEN_ZERO"
+        );
+
+        require(
+            amountETH > 0,
+            "ApexV2Router: ETH_ZERO"
+        );
+
+        _safeTransferFrom(
             token,
             msg.sender,
             pair,
@@ -238,6 +402,21 @@ contract ApexV2Router {
 
         liquidity =
             IApexV2Pair(pair).mint(to);
+
+        require(
+            liquidity > 0,
+            "ApexV2Router: INSUFFICIENT_LIQUIDITY_MINTED"
+        );
+
+        uint256 refundETH =
+            msg.value - amountETH;
+
+        if (refundETH > 0) {
+            _safeTransferETH(
+                msg.sender,
+                refundETH
+            );
+        }
     }
 
     // ============================================================
@@ -247,19 +426,40 @@ contract ApexV2Router {
     function removeLiquidity(
         address tokenA,
         address tokenB,
-        uint liquidity,
-        uint amountAMin,
-        uint amountBMin,
+        uint256 liquidity,
+        uint256 amountAMin,
+        uint256 amountBMin,
         address to,
-        uint deadline
+        uint256 deadline
     )
         public
         ensure(deadline)
         returns (
-            uint amountA,
-            uint amountB
+            uint256 amountA,
+            uint256 amountB
         )
     {
+        require(
+            tokenA != tokenB,
+            "ApexV2Router: IDENTICAL_TOKEN"
+        );
+
+        require(
+            tokenA != address(0) &&
+            tokenB != address(0),
+            "ApexV2Router: ZERO_ADDRESS"
+        );
+
+        require(
+            to != address(0),
+            "ApexV2Router: ZERO_RECIPIENT"
+        );
+
+        require(
+            liquidity > 0,
+            "ApexV2Router: LIQUIDITY_ZERO"
+        );
+
         address pair =
             ApexV2Library.pairFor(
                 factory,
@@ -272,15 +472,16 @@ contract ApexV2Router {
             "ApexV2Router: PAIR_NOT_FOUND"
         );
 
-        IERC20(pair).transferFrom(
+        _safeTransferFrom(
+            pair,
             msg.sender,
             pair,
             liquidity
         );
 
         (
-            uint amount0,
-            uint amount1
+            uint256 amount0,
+            uint256 amount1
         ) =
             IApexV2Pair(pair).burn(to);
 
@@ -315,18 +516,34 @@ contract ApexV2Router {
 
     function removeLiquidityETH(
         address token,
-        uint liquidity,
-        uint amountTokenMin,
-        uint amountETHMin,
+        uint256 liquidity,
+        uint256 amountTokenMin,
+        uint256 amountETHMin,
         address to,
-        uint deadline
+        uint256 deadline
     )
         external
+        ensure(deadline)
         returns (
-            uint amountToken,
-            uint amountETH
+            uint256 amountToken,
+            uint256 amountETH
         )
     {
+        require(
+            token != address(0),
+            "ApexV2Router: ZERO_ADDRESS"
+        );
+
+        require(
+            token != WETH,
+            "ApexV2Router: INVALID_TOKEN"
+        );
+
+        require(
+            to != address(0),
+            "ApexV2Router: ZERO_RECIPIENT"
+        );
+
         (
             amountToken,
             amountETH
@@ -351,14 +568,9 @@ contract ApexV2Router {
             amountETH
         );
 
-        (bool success,) =
-            payable(to).call{
-                value: amountETH
-            }("");
-
-        require(
-            success,
-            "ApexV2Router: ETH_TRANSFER_FAILED"
+        _safeTransferETH(
+            to,
+            amountETH
         );
     }
 
@@ -367,21 +579,26 @@ contract ApexV2Router {
     // ============================================================
 
     function swapExactTokensForTokens(
-        uint amountIn,
-        uint amountOutMin,
+        uint256 amountIn,
+        uint256 amountOutMin,
         address[] calldata path,
         address to,
-        uint deadline
+        uint256 deadline
     )
         external
         ensure(deadline)
         returns (
-            uint[] memory amounts
+            uint256[] memory amounts
         )
     {
         require(
-            path.length >= 2,
-            "ApexV2Router: INVALID_PATH"
+            amountIn > 0,
+            "ApexV2Router: INSUFFICIENT_INPUT"
+        );
+
+        _validateSwapPath(
+            path,
+            to
         );
 
         amounts =
@@ -391,8 +608,11 @@ contract ApexV2Router {
                 path
             );
 
+        uint256 amountOut =
+            amounts[amounts.length - 1];
+
         require(
-            amounts[amounts.length - 1] >= amountOutMin,
+            amountOut >= amountOutMin,
             "ApexV2Router: SLIPPAGE"
         );
 
@@ -408,7 +628,7 @@ contract ApexV2Router {
             "ApexV2Router: PAIR_NOT_FOUND"
         );
 
-        _transferFrom(
+        _safeTransferFrom(
             path[0],
             msg.sender,
             firstPair,
@@ -427,18 +647,23 @@ contract ApexV2Router {
     // ============================================================
 
     function swapExactETHForTokens(
-        uint amountOutMin,
+        uint256 amountOutMin,
         address[] calldata path,
         address to,
-        uint deadline
+        uint256 deadline
     )
         external
         payable
         ensure(deadline)
         returns (
-            uint[] memory amounts
+            uint256[] memory amounts
         )
     {
+        require(
+            msg.value > 0,
+            "ApexV2Router: INSUFFICIENT_INPUT"
+        );
+
         require(
             path.length >= 2,
             "ApexV2Router: INVALID_PATH"
@@ -449,6 +674,11 @@ contract ApexV2Router {
             "ApexV2Router: INVALID_WETH_PATH"
         );
 
+        _validateSwapPath(
+            path,
+            to
+        );
+
         amounts =
             ApexV2Library.getAmountsOut(
                 factory,
@@ -456,10 +686,17 @@ contract ApexV2Router {
                 path
             );
 
+        uint256 amountOut =
+            amounts[amounts.length - 1];
+
         require(
-            amounts[amounts.length - 1] >= amountOutMin,
+            amountOut >= amountOutMin,
             "ApexV2Router: SLIPPAGE"
         );
+
+        IWETH9(WETH).deposit{
+            value: msg.value
+        }();
 
         address pair =
             ApexV2Library.pairFor(
@@ -472,10 +709,6 @@ contract ApexV2Router {
             pair != address(0),
             "ApexV2Router: PAIR_NOT_FOUND"
         );
-
-        IWETH9(WETH).deposit{
-            value: msg.value
-        }();
 
         _safeTransfer(
             WETH,
@@ -495,18 +728,23 @@ contract ApexV2Router {
     // ============================================================
 
     function swapExactTokensForETH(
-        uint amountIn,
-        uint amountOutMin,
+        uint256 amountIn,
+        uint256 amountOutMin,
         address[] calldata path,
         address to,
-        uint deadline
+        uint256 deadline
     )
         external
         ensure(deadline)
         returns (
-            uint[] memory amounts
+            uint256[] memory amounts
         )
     {
+        require(
+            amountIn > 0,
+            "ApexV2Router: INSUFFICIENT_INPUT"
+        );
+
         require(
             path.length >= 2,
             "ApexV2Router: INVALID_PATH"
@@ -517,6 +755,11 @@ contract ApexV2Router {
             "ApexV2Router: INVALID_WETH_PATH"
         );
 
+        _validateSwapPath(
+            path,
+            to
+        );
+
         amounts =
             ApexV2Library.getAmountsOut(
                 factory,
@@ -524,12 +767,17 @@ contract ApexV2Router {
                 path
             );
 
-        uint amountWETH =
+        uint256 amountWETH =
             amounts[amounts.length - 1];
 
         require(
             amountWETH >= amountOutMin,
             "ApexV2Router: SLIPPAGE"
+        );
+
+        require(
+            amountWETH > 0,
+            "ApexV2Router: ZERO_OUTPUT"
         );
 
         address firstPair =
@@ -544,7 +792,7 @@ contract ApexV2Router {
             "ApexV2Router: PAIR_NOT_FOUND"
         );
 
-        _transferFrom(
+        _safeTransferFrom(
             path[0],
             msg.sender,
             firstPair,
@@ -557,25 +805,13 @@ contract ApexV2Router {
             address(this)
         );
 
-        /*
-         * CRITICAL:
-         *
-         * Do NOT use the router's entire WETH balance here.
-         *
-         * Only unwrap the WETH amount generated by this swap.
-         */
         IWETH9(WETH).withdraw(
             amountWETH
         );
 
-        (bool success,) =
-            payable(to).call{
-                value: amountWETH
-            }("");
-
-        require(
-            success,
-            "ApexV2Router: ETH_FAILED"
+        _safeTransferETH(
+            to,
+            amountWETH
         );
     }
 
@@ -584,7 +820,7 @@ contract ApexV2Router {
     // ============================================================
 
     function _swap(
-        uint[] memory amounts,
+        uint256[] memory amounts,
         address[] memory path,
         address to
     )
@@ -600,16 +836,32 @@ contract ApexV2Router {
             "ApexV2Router: INVALID_AMOUNTS"
         );
 
+        require(
+            to != address(0),
+            "ApexV2Router: ZERO_RECIPIENT"
+        );
+
         for (
-            uint i = 0;
+            uint256 i = 0;
             i < path.length - 1;
-            i++
+            ++i
         ) {
             address input =
                 path[i];
 
             address output =
                 path[i + 1];
+
+            require(
+                input != address(0) &&
+                output != address(0),
+                "ApexV2Router: ZERO_ADDRESS"
+            );
+
+            require(
+                input != output,
+                "ApexV2Router: IDENTICAL_TOKEN"
+            );
 
             address pair =
                 ApexV2Library.pairFor(
@@ -623,16 +875,21 @@ contract ApexV2Router {
                 "ApexV2Router: PAIR_NOT_FOUND"
             );
 
+            uint256 amountOut =
+                amounts[i + 1];
+
+            require(
+                amountOut > 0,
+                "ApexV2Router: ZERO_OUTPUT"
+            );
+
             address token0 =
                 input < output
                     ? input
                     : output;
 
-            uint amountOut =
-                amounts[i + 1];
-
-            uint amount0Out;
-            uint amount1Out;
+            uint256 amount0Out;
+            uint256 amount1Out;
 
             if (input == token0) {
                 amount0Out = 0;
@@ -645,7 +902,9 @@ contract ApexV2Router {
 
             address receiver;
 
-            if (i < path.length - 2) {
+            if (
+                i < path.length - 2
+            ) {
                 receiver =
                     ApexV2Library.pairFor(
                         factory,
@@ -672,17 +931,82 @@ contract ApexV2Router {
     }
 
     // ============================================================
-    // INTERNAL TRANSFER FROM
+    // INTERNAL SWAP PATH VALIDATION
     // ============================================================
 
-    function _transferFrom(
+    function _validateSwapPath(
+        address[] calldata path,
+        address to
+    )
+        internal
+        view
+    {
+        require(
+            path.length >= 2,
+            "ApexV2Router: INVALID_PATH"
+        );
+
+        require(
+            to != address(0),
+            "ApexV2Router: ZERO_RECIPIENT"
+        );
+
+        for (
+            uint256 i = 0;
+            i < path.length;
+            ++i
+        ) {
+            address token =
+                path[i];
+
+            require(
+                token != address(0),
+                "ApexV2Router: ZERO_ADDRESS"
+            );
+
+            if (i > 0) {
+                require(
+                    token != path[i - 1],
+                    "ApexV2Router: IDENTICAL_TOKEN"
+                );
+
+                address pair =
+                    ApexV2Library.pairFor(
+                        factory,
+                        path[i - 1],
+                        token
+                    );
+
+                require(
+                    pair != address(0),
+                    "ApexV2Router: PAIR_NOT_FOUND"
+                );
+            }
+        }
+    }
+
+    // ============================================================
+    // INTERNAL SAFE TRANSFER FROM
+    // ============================================================
+
+    function _safeTransferFrom(
         address token,
         address from,
         address to,
-        uint value
+        uint256 value
     )
         internal
     {
+        require(
+            token != address(0),
+            "ApexV2Router: ZERO_TOKEN"
+        );
+
+        require(
+            to != address(0),
+            "ApexV2Router: ZERO_RECIPIENT"
+        );
+
         (
             bool success,
             bytes memory data
@@ -702,14 +1026,13 @@ contract ApexV2Router {
         );
 
         require(
-            data.length == 32,
-            "ApexV2Router: NO_RETURN_DATA"
-        );
-
-        require(
-            abi.decode(
-                data,
-                (bool)
+            data.length == 0 ||
+            (
+                data.length == 32 &&
+                abi.decode(
+                    data,
+                    (bool)
+                )
             ),
             "ApexV2Router: TRANSFER_FROM_FALSE"
         );
@@ -722,10 +1045,20 @@ contract ApexV2Router {
     function _safeTransfer(
         address token,
         address to,
-        uint value
+        uint256 value
     )
         internal
     {
+        require(
+            token != address(0),
+            "ApexV2Router: ZERO_TOKEN"
+        );
+
+        require(
+            to != address(0),
+            "ApexV2Router: ZERO_RECIPIENT"
+        );
+
         (
             bool success,
             bytes memory data
@@ -751,6 +1084,32 @@ contract ApexV2Router {
                 )
             ),
             "ApexV2Router: TRANSFER_FAILED"
+        );
+    }
+
+    // ============================================================
+    // INTERNAL SAFE ETH TRANSFER
+    // ============================================================
+
+    function _safeTransferETH(
+        address to,
+        uint256 value
+    )
+        internal
+    {
+        require(
+            to != address(0),
+            "ApexV2Router: ZERO_RECIPIENT"
+        );
+
+        (bool success,) =
+            payable(to).call{
+                value: value
+            }("");
+
+        require(
+            success,
+            "ApexV2Router: ETH_TRANSFER_FAILED"
         );
     }
 }

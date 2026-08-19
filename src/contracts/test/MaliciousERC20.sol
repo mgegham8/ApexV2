@@ -1,280 +1,230 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
-
+pragma solidity 0.8.28;
 
 contract MaliciousERC20 {
+    string public name =
+        "Malicious";
 
+    string public symbol =
+        "BAD";
 
-    string public name = "Malicious";
-    string public symbol = "BAD";
+    uint8 public constant decimals =
+        18;
 
-    uint8 public decimals = 18;
+    uint256 public totalSupply;
 
+    mapping(address => uint256)
+        public balanceOf;
 
-    uint public totalSupply;
-
-
-    mapping(address => uint)
-    public balanceOf;
-
-
-    mapping(address => mapping(address => uint))
-    public allowance;
-
-
+    mapping(address => mapping(address => uint256))
+        public allowance;
 
     bool public failTransferFrom;
-
     bool public failTransfer;
 
     bool public revertTransferFrom;
-
     bool public revertTransfer;
 
+    event Transfer(
+        address indexed from,
+        address indexed to,
+        uint256 amount
+    );
 
+    event Approval(
+        address indexed owner,
+        address indexed spender,
+        uint256 amount
+    );
 
-    constructor(){
-
+    constructor() {
         _mint(
             msg.sender,
-            1000000 ether
+            1_000_000 ether
         );
-
     }
-
-
-
-
 
     function _mint(
         address to,
-        uint amount
+        uint256 amount
     )
-    internal
+        internal
     {
+        balanceOf[to] +=
+            amount;
 
-        balanceOf[to] += amount;
+        totalSupply +=
+            amount;
 
-        totalSupply += amount;
-
+        emit Transfer(
+            address(0),
+            to,
+            amount
+        );
     }
 
-
-
-
-
-
-
+    function mint(
+        address to,
+        uint256 amount
+    )
+        external
+    {
+        _mint(
+            to,
+            amount
+        );
+    }
 
     function approve(
         address spender,
-        uint amount
+        uint256 amount
     )
-    external
-    returns(bool)
+        external
+        returns (bool)
     {
+        allowance[msg.sender][spender] =
+            amount;
 
-
-        allowance[msg.sender][spender]
-        =
-        amount;
-
+        emit Approval(
+            msg.sender,
+            spender,
+            amount
+        );
 
         return true;
-
     }
-
-
-
-
-
-
-
-
 
     function transfer(
         address to,
-        uint amount
+        uint256 amount
     )
-    external
-    returns(bool)
+        external
+        returns (bool)
     {
-
-
-        if(revertTransfer)
-        {
+        if (revertTransfer) {
             revert(
                 "MALICIOUS_TRANSFER_REVERT"
             );
         }
 
-
-
-        if(failTransfer)
-        {
+        if (failTransfer) {
             return false;
         }
-
-
 
         require(
             balanceOf[msg.sender] >= amount,
             "INSUFFICIENT_BALANCE"
         );
 
+        balanceOf[msg.sender] -=
+            amount;
 
+        balanceOf[to] +=
+            amount;
 
-        balanceOf[msg.sender]
-        -= amount;
-
-
-        balanceOf[to]
-        += amount;
-
-
+        emit Transfer(
+            msg.sender,
+            to,
+            amount
+        );
 
         return true;
-
     }
-
-
-
-
-
-
-
-
 
     function transferFrom(
         address from,
         address to,
-        uint amount
+        uint256 amount
     )
-    external
-    returns(bool)
+        external
+        returns (bool)
     {
-
-
-        if(revertTransferFrom)
-        {
+        if (revertTransferFrom) {
             revert(
                 "MALICIOUS_TRANSFERFROM_REVERT"
             );
         }
 
-
-
-
-        if(failTransferFrom)
-        {
+        if (failTransferFrom) {
             return false;
         }
 
-
-
+        uint256 allowed =
+            allowance[from][msg.sender];
 
         require(
-            allowance[from][msg.sender] >= amount,
+            allowed >= amount,
             "INSUFFICIENT_ALLOWANCE"
         );
-
-
 
         require(
             balanceOf[from] >= amount,
             "INSUFFICIENT_BALANCE"
         );
 
+        if (
+            allowed !=
+            type(uint256).max
+        ) {
+            allowance[from][msg.sender] =
+                allowed -
+                amount;
 
+            emit Approval(
+                from,
+                msg.sender,
+                allowance[from][msg.sender]
+            );
+        }
 
+        balanceOf[from] -=
+            amount;
 
-        allowance[from][msg.sender]
-        -= amount;
+        balanceOf[to] +=
+            amount;
 
-
-
-        balanceOf[from]
-        -= amount;
-
-
-
-        balanceOf[to]
-        += amount;
-
-
-
+        emit Transfer(
+            from,
+            to,
+            amount
+        );
 
         return true;
-
     }
-
-
-
-
-
-
-
-
 
     function setFailTransferFrom(
         bool value
     )
-    external
+        external
     {
-
-        failTransferFrom = value;
-
+        failTransferFrom =
+            value;
     }
-
-
-
-
-
-
-
 
     function setFailTransfer(
         bool value
     )
-    external
+        external
     {
-
-        failTransfer = value;
-
+        failTransfer =
+            value;
     }
-
-
-
-
-
-
 
     function setRevertTransferFrom(
         bool value
     )
-    external
+        external
     {
-
-        revertTransferFrom = value;
-
+        revertTransferFrom =
+            value;
     }
-
-
-
-
-
-
 
     function setRevertTransfer(
         bool value
     )
-    external
+        external
     {
-
-        revertTransfer = value;
-
+        revertTransfer =
+            value;
     }
-
-
-
 }

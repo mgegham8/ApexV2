@@ -1,76 +1,68 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-
 import "forge-std/Test.sol";
 
+import "../src/contracts/ApexV2Factory.sol";
 import "../src/contracts/ApexV2Pair.sol";
 import "../src/contracts/test/MockERC20.sol";
 
 import "./handlers/ApexV2PairHandler.sol";
 
-
-
 contract ApexV2PairInvariantTest is Test {
-
-
+    ApexV2Factory public factory;
     ApexV2Pair public pair;
 
     MockERC20 public token0;
     MockERC20 public token1;
 
-
     ApexV2PairHandler public handler;
-
-
-
-    uint256 public lastK;
-
-
-    bool public poolInitialized;
-
-
-
-    uint112 public lastReserve0;
-    uint112 public lastReserve1;
-
-
-
-
-
-
 
     function setUp()
         public
     {
-
-
-        token0 =
+        MockERC20 tokenA =
             new MockERC20(
-                "Token0",
-                "TK0"
+                "TokenA",
+                "TKA"
             );
 
-
-        token1 =
+        MockERC20 tokenB =
             new MockERC20(
-                "Token1",
-                "TK1"
+                "TokenB",
+                "TKB"
             );
 
+        factory =
+            new ApexV2Factory(
+                address(this)
+            );
 
+        address pairAddress =
+            factory.createPair(
+                address(tokenA),
+                address(tokenB)
+            );
 
         pair =
-            new ApexV2Pair();
+            ApexV2Pair(
+                pairAddress
+            );
 
-
-
-        pair.initialize(
-            address(token0),
-            address(token1)
-        );
-
-
+        /*
+         * Handler token references MUST follow the Pair's canonical
+         * token0/token1 ordering.
+         */
+        if (
+            pair.token0() ==
+            address(tokenA)
+        ) {
+            token0 = tokenA;
+            token1 = tokenB;
+        } else {
+            token0 = tokenB;
+            token1 = tokenA;
+        }
 
         handler =
             new ApexV2PairHandler(
@@ -79,420 +71,187 @@ contract ApexV2PairInvariantTest is Test {
                 token1
             );
 
-
-
         targetContract(
             address(handler)
         );
-
     }
 
+    // ============================================================
+    // RESERVES <= BALANCES
+    // ============================================================
 
-
-
-
-
-
-
-
-
-    /*
-        reserves <= balances
-    */
     function invariant_reserves_not_bigger_than_balances()
         public
+        view
     {
-
         (
             uint112 reserve0,
             uint112 reserve1,
+        ) =
+            pair.getReserves();
 
-        ) = pair.getReserves();
-
-
-
-        assertLe(
-            reserve0,
+        uint256 balance0 =
             token0.balanceOf(
                 address(pair)
-            )
-        );
+            );
 
-
-        assertLe(
-            reserve1,
+        uint256 balance1 =
             token1.balanceOf(
                 address(pair)
-            )
+            );
+
+        assertLe(
+            uint256(reserve0),
+            balance0
         );
 
+        assertLe(
+            uint256(reserve1),
+            balance1
+        );
     }
 
+    // ============================================================
+    // UINT112 RESERVE BOUNDS
+    // ============================================================
 
-
-
-
-
-
-
-
-    /*
-        uint112 overflow protection
-    */
     function invariant_reserves_uint112()
         public
         view
     {
-
         (
             uint112 reserve0,
             uint112 reserve1,
-
-        ) = pair.getReserves();
-
-
+        ) =
+            pair.getReserves();
 
         assertLe(
-            reserve0,
-            type(uint112).max
+            uint256(reserve0),
+            uint256(type(uint112).max)
         );
-
 
         assertLe(
-            reserve1,
-            type(uint112).max
+            uint256(reserve1),
+            uint256(type(uint112).max)
         );
-
     }
 
+    // ============================================================
+    // SWAP K INVARIANT
+    // ============================================================
 
-
-
-
-
-
-
-
-    /*
-        K should never decrease
-    */
-    function invariant_K_never_decreases()
+    function invariant_swaps_never_decrease_k()
         public
+        view
     {
-
-
-        (
-            uint112 reserve0,
-            uint112 reserve1,
-
-        ) = pair.getReserves();
-
-
-
-        if(
-            reserve0 == 0 ||
-            reserve1 == 0
-        )
-        {
-            return;
-        }
-
-
-
-
-        uint256 currentK =
-            uint256(reserve0)
-            *
-            uint256(reserve1);
-
-
-
-
-        if(lastK != 0)
-        {
-
-            assertGe(
-                currentK,
-                lastK,
-                "K decreased"
-            );
-
-        }
-
-
-
-        lastK = currentK;
-
+        assertFalse(
+            handler.swapInvariantBroken(),
+            "SWAP_K_DECREASED"
+        );
     }
 
+    // ============================================================
+    // MINIMUM LIQUIDITY LOCK
+    // ============================================================
 
-
-
-
-
-
-
-
-    /*
-        sync correctness
-    */
-    function invariant_sync_state()
+    function invariant_minimum_liquidity_remains_locked()
         public
+        view
     {
-
-
-        uint balance0 =
-            token0.balanceOf(
-                address(pair)
-            );
-
-
-        uint balance1 =
-            token1.balanceOf(
-                address(pair)
-            );
-
-
-
-        if(
-            balance0 > type(uint112).max ||
-            balance1 > type(uint112).max
-        )
-        {
-            return;
-        }
-
-
-
-        pair.sync();
-
-
-
-
-        (
-            uint112 reserve0,
-            uint112 reserve1,
-
-        ) = pair.getReserves();
-
-
+        uint256 minimumLiquidity =
+            pair.MINIMUM_LIQUIDITY();
 
         assertEq(
-            reserve0,
-            balance0
+            pair.balanceOf(
+                address(0)
+            ),
+            minimumLiquidity
         );
 
-
-        assertEq(
-            reserve1,
-            balance1
+        assertGe(
+            pair.totalSupply(),
+            minimumLiquidity
         );
-
     }
 
+    // ============================================================
+    // TOTAL SUPPLY
+    // ============================================================
 
-
-
-
-
-
-
-
-    /*
-        reserves tracking
-    */
-    function invariant_reserve_tracking()
-        public
-    {
-
-
-        (
-            uint112 reserve0,
-            uint112 reserve1,
-
-        ) = pair.getReserves();
-
-
-
-        if(poolInitialized)
-        {
-
-            assertGe(
-                reserve0,
-                0
-            );
-
-
-            assertGe(
-                reserve1,
-                0
-            );
-
-        }
-
-
-
-        lastReserve0 =
-            reserve0;
-
-
-        lastReserve1 =
-            reserve1;
-
-
-
-        if(
-            reserve0 > 0 &&
-            reserve1 > 0
-        )
-        {
-            poolInitialized = true;
-        }
-
-    }
-
-
-
-
-
-
-
-
-
-    /*
-        donation should not update reserves
-    */
-    function invariant_donation_not_update_reserves()
-        public
-    {
-
-
-        (
-            uint112 reserve0,
-            uint112 reserve1,
-
-        ) = pair.getReserves();
-
-
-
-        uint balance0 =
-            token0.balanceOf(
-                address(pair)
-            );
-
-
-        uint balance1 =
-            token1.balanceOf(
-                address(pair)
-            );
-
-
-
-        if(
-            balance0 > reserve0 ||
-            balance1 > reserve1
-        )
-        {
-
-            assertGe(
-                balance0,
-                reserve0
-            );
-
-
-            assertGe(
-                balance1,
-                reserve1
-            );
-
-        }
-
-    }
-
-
-
-
-
-
-
-
-
-    /*
-        LP supply safety
-    */
     function invariant_total_supply_valid()
         public
         view
     {
-
-
-        uint256 supply =
-            pair.totalSupply();
-
-
-
-        assertLe(
-            supply,
-            type(uint256).max
+        assertGe(
+            pair.totalSupply(),
+            pair.MINIMUM_LIQUIDITY()
         );
-
-
-
-        if(poolInitialized)
-        {
-
-            assertGe(
-                supply,
-                pair.MINIMUM_LIQUIDITY()
-            );
-
-        }
-
     }
 
+    // ============================================================
+    // DONATION ACCOUNTING
+    // ============================================================
 
-
-
-
-
-
-
-
-    /*
-        skim should not break reserves
-    */
-    function invariant_skim_safe()
+    function invariant_donation_accounting_safe()
         public
+        view
     {
-
-        pair.skim(
-            address(handler)
-        );
-
-
         (
             uint112 reserve0,
             uint112 reserve1,
+        ) =
+            pair.getReserves();
 
-        ) = pair.getReserves();
-
-
-
-        assertLe(
-            reserve0,
+        uint256 balance0 =
             token0.balanceOf(
                 address(pair)
-            )
-        );
+            );
 
-
-        assertLe(
-            reserve1,
+        uint256 balance1 =
             token1.balanceOf(
                 address(pair)
-            )
+            );
+
+        assertGe(
+            balance0,
+            uint256(reserve0)
         );
 
+        assertGe(
+            balance1,
+            uint256(reserve1)
+        );
     }
 
+    // ============================================================
+    // TOKEN IMMUTABILITY
+    // ============================================================
+
+    function invariant_tokens_never_change()
+        public
+        view
+    {
+        assertEq(
+            pair.token0(),
+            address(token0)
+        );
+
+        assertEq(
+            pair.token1(),
+            address(token1)
+        );
+    }
+
+    // ============================================================
+    // HANDLER STATE
+    // ============================================================
+
+    function invariant_handler_state_valid()
+        public
+        view
+    {
+        assertFalse(
+            handler.swapInvariantBroken()
+        );
+    }
 }

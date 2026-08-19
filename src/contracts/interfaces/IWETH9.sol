@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
-
+pragma solidity 0.8.28;
 
 interface IWETH9 {
-
-
     // =========================
     // ERC20 METADATA
     // =========================
@@ -12,22 +9,17 @@ interface IWETH9 {
     function name()
         external
         view
-        returns(string memory);
-
+        returns (string memory);
 
     function symbol()
         external
         view
-        returns(string memory);
-
+        returns (string memory);
 
     function decimals()
         external
         view
-        returns(uint8);
-
-
-
+        returns (uint8);
 
     // =========================
     // ERC20 DATA
@@ -36,17 +28,14 @@ interface IWETH9 {
     function totalSupply()
         external
         view
-        returns(uint);
-
+        returns (uint256);
 
     function balanceOf(
         address account
     )
         external
         view
-        returns(uint);
-
-
+        returns (uint256);
 
     function allowance(
         address owner,
@@ -54,11 +43,7 @@ interface IWETH9 {
     )
         external
         view
-        returns(uint);
-
-
-
-
+        returns (uint256);
 
     // =========================
     // ERC20 FUNCTIONS
@@ -66,34 +51,25 @@ interface IWETH9 {
 
     function approve(
         address spender,
-        uint amount
+        uint256 amount
     )
         external
-        returns(bool);
-
-
+        returns (bool);
 
     function transfer(
         address to,
-        uint amount
+        uint256 amount
     )
         external
-        returns(bool);
-
-
+        returns (bool);
 
     function transferFrom(
         address from,
         address to,
-        uint amount
+        uint256 amount
     )
         external
-        returns(bool);
-
-
-
-
-
+        returns (bool);
 
     // =========================
     // WETH FUNCTIONS
@@ -103,14 +79,10 @@ interface IWETH9 {
         external
         payable;
 
-
-
     function withdraw(
-        uint amount
+        uint256 amount
     )
         external;
-
-
 
     // =========================
     // EVENTS
@@ -118,27 +90,23 @@ interface IWETH9 {
 
     event Deposit(
         address indexed dst,
-        uint wad
+        uint256 wad
     );
-
 
     event Withdrawal(
         address indexed src,
-        uint wad
+        uint256 wad
     );
-
 
     event Transfer(
         address indexed src,
         address indexed dst,
-        uint wad
+        uint256 wad
     );
-
 
     event Approval(
         address indexed src,
         address indexed guy,
-        uint wad
+        uint256 wad
     );
-
 }

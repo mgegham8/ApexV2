@@ -1,100 +1,83 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
-
+pragma solidity 0.8.28;
 
 contract FalseReturnERC20 {
+    string public name =
+        "False Return Token";
 
+    string public symbol =
+        "FALSE";
 
-    string public name = "False Return Token";
-    string public symbol = "FALSE";
-    uint8 public decimals = 18;
+    uint8 public constant decimals =
+        18;
 
+    uint256 public totalSupply;
 
-    uint public totalSupply;
+    mapping(address => uint256)
+        public balanceOf;
 
-
-    mapping(address => uint) public balanceOf;
-    mapping(address => mapping(address => uint)) public allowance;
-
-
+    mapping(address => mapping(address => uint256))
+        public allowance;
 
     function mint(
         address to,
-        uint amount
+        uint256 amount
     )
-    external
+        external
     {
+        balanceOf[to] +=
+            amount;
 
-        balanceOf[to] += amount;
-
-        totalSupply += amount;
-
+        totalSupply +=
+            amount;
     }
-
-
-
-
 
     function approve(
         address spender,
-        uint amount
+        uint256 amount
     )
-    external
-    returns(bool)
+        external
+        returns (bool)
     {
-
-        allowance[msg.sender][spender] = amount;
+        allowance[msg.sender][spender] =
+            amount;
 
         return true;
-
     }
-
-
-
-
 
     function transfer(
         address to,
-        uint amount
+        uint256 amount
     )
-    external
-    returns(bool)
+        external
+        returns (bool)
     {
+        balanceOf[msg.sender] -=
+            amount;
 
-        balanceOf[msg.sender] -= amount;
-
-        balanceOf[to] += amount;
-
+        balanceOf[to] +=
+            amount;
 
         return false;
-
     }
-
-
-
-
 
     function transferFrom(
         address from,
         address to,
-        uint amount
+        uint256 amount
     )
-    external
-    returns(bool)
+        external
+        returns (bool)
     {
+        allowance[from][msg.sender] -=
+            amount;
 
+        balanceOf[from] -=
+            amount;
 
-        allowance[from][msg.sender] -= amount;
-
-
-        balanceOf[from] -= amount;
-
-        balanceOf[to] += amount;
-
+        balanceOf[to] +=
+            amount;
 
         return false;
-
     }
-
-
 }

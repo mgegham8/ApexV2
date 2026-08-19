@@ -1,0 +1,57 @@
+name: ApexV2 CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+
+  pull_request:
+    branches:
+      - main
+      - develop
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apexv2-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Foundry Build & Test
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Foundry version
+        run: |
+          forge --version
+          cast --version
+          anvil --version
+
+      - name: Install dependencies
+        run: forge install
+
+      - name: Build
+        run: forge build --sizes
+
+      - name: Run tests
+        run: forge test -vv
+
+      - name: Run formatter check
+        run: forge fmt --check
