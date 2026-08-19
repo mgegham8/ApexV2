@@ -42,16 +42,7 @@ contract ApexV2PairGriefingTest is Test {
         token0.approve(address(router), amount0);
         token1.approve(address(router), amount1);
 
-        router.addLiquidity(
-            address(token0),
-            address(token1),
-            amount0,
-            amount1,
-            0,
-            0,
-            address(this),
-            block.timestamp
-        );
+        router.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0, address(this), block.timestamp);
 
         assertEq(pair.balanceOf(address(0)), 1000, "Minimum liquidity not locked correctly");
         assertTrue(pair.balanceOf(address(this)) > 0, "Attacker did not receive LP tokens");
@@ -67,16 +58,7 @@ contract ApexV2PairGriefingTest is Test {
         token0.approve(address(router), amount0);
         token1.approve(address(router), amount1);
 
-        router.addLiquidity(
-            address(token0),
-            address(token1),
-            amount0,
-            amount1,
-            0,
-            0,
-            address(this),
-            block.timestamp
-        );
+        router.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0, address(this), block.timestamp);
 
         address[] memory path = new address[](2);
         path[0] = address(token0);
@@ -87,13 +69,7 @@ contract ApexV2PairGriefingTest is Test {
             token0.mint(address(this), tinyAmount);
             token0.approve(address(router), tinyAmount);
 
-            try router.swapExactTokensForTokens(
-                tinyAmount,
-                0,
-                path,
-                address(this),
-                block.timestamp
-            ) {} catch {}
+            try router.swapExactTokensForTokens(tinyAmount, 0, path, address(this), block.timestamp) {} catch {}
         }
 
         (uint112 r0, uint112 r1,) = pair.getReserves();

@@ -33,13 +33,7 @@ contract ApexV2SwapFuzzHandler is Test {
         path[0] = zeroToOne ? address(token0) : address(token1);
         path[1] = zeroToOne ? address(token1) : address(token0);
 
-        try router.swapExactTokensForTokens(
-            amountIn,
-            0,
-            path,
-            msg.sender,
-            block.timestamp
-        ) returns (uint256[] memory) {
+        try router.swapExactTokensForTokens(amountIn, 0, path, msg.sender, block.timestamp) returns (uint256[] memory) {
             successfulSwaps++;
         } catch {}
     }
@@ -89,7 +83,7 @@ contract ApexV2SwapFuzzTest is Test {
     function invariant_kNeverDecreasesWithTolerance() public view {
         (uint112 r0, uint112 r1,) = pair.getReserves();
         uint256 currentK = uint256(r0) * uint256(r1);
-        
+
         // K can increase due to swap fees, but should never decrease below initial K
         assertTrue(currentK >= initialK, "Invariant K decreased below initial K");
     }

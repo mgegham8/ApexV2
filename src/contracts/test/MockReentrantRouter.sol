@@ -2,13 +2,7 @@
 pragma solidity 0.8.28;
 
 interface IApexReentrantController {
-    function launch(
-        address weth,
-        uint256 tokenAmount,
-        uint256 ethAmount
-    )
-        external
-        payable;
+    function launch(address weth, uint256 tokenAmount, uint256 ethAmount) external payable;
 }
 
 contract MockReentrantRouter {
@@ -29,11 +23,7 @@ contract MockReentrantRouter {
     // SETUP
     // ============================================================
 
-    function setController(
-        address _controller
-    )
-        external
-    {
+    function setController(address _controller) external {
         if (_controller == address(0)) {
             revert ZeroController();
         }
@@ -42,58 +32,32 @@ contract MockReentrantRouter {
             revert ControllerAlreadySet();
         }
 
-        controller =
-            _controller;
+        controller = _controller;
     }
 
-    function setAttack(
-        address _weth,
-        uint256 _tokenAmount,
-        uint256 _ethAmount
-    )
-        external
-    {
-        weth =
-            _weth;
+    function setAttack(address _weth, uint256 _tokenAmount, uint256 _ethAmount) external {
+        weth = _weth;
 
-        tokenAmount =
-            _tokenAmount;
+        tokenAmount = _tokenAmount;
 
-        ethAmount =
-            _ethAmount;
+        ethAmount = _ethAmount;
 
-        attack =
-            true;
+        attack = true;
     }
 
     // ============================================================
     // MOCK ROUTER
     // ============================================================
 
-    function addLiquidityETH(
-        address,
-        uint256 amountTokenDesired,
-        uint256,
-        uint256,
-        address,
-        uint256
-    )
+    function addLiquidityETH(address, uint256 amountTokenDesired, uint256, uint256, address, uint256)
         external
         payable
-        returns (
-            uint256 amountToken,
-            uint256 amountETH,
-            uint256 liquidity
-        )
+        returns (uint256 amountToken, uint256 amountETH, uint256 liquidity)
     {
         if (attack) {
-            attack =
-                false;
+            attack = false;
 
-            if (
-                address(this).balance <
-                ethAmount
-            ) {
+            if (address(this).balance < ethAmount) {
                 revert InsufficientETH();
             }
 
@@ -102,26 +66,11 @@ contract MockReentrantRouter {
              *
              * The real ApexLaunchController must reject this call.
              */
-            IApexReentrantController(
-                controller
-            ).launch{
-                value: ethAmount
-            }(
-                weth,
-                tokenAmount,
-                ethAmount
-            );
+            IApexReentrantController(controller).launch{value: ethAmount}(weth, tokenAmount, ethAmount);
         }
 
-        return (
-            amountTokenDesired,
-            msg.value,
-            1
-        );
+        return (amountTokenDesired, msg.value, 1);
     }
 
-    receive()
-        external
-        payable
-    {}
+    receive() external payable {}
 }

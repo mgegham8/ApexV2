@@ -12,246 +12,105 @@ contract RebaseERC20 {
     uint256 public totalShares;
     uint256 public multiplier = BASE;
 
-    mapping(address => uint256)
-        internal shares;
+    mapping(address => uint256) internal shares;
 
-    mapping(address => mapping(address => uint256))
-        public allowance;
+    mapping(address => mapping(address => uint256)) public allowance;
 
-    event Transfer(
-        address indexed from,
-        address indexed to,
-        uint256 value
-    );
+    event Transfer(address indexed from, address indexed to, uint256 value);
 
-    event Approval(
-        address indexed owner,
-        address indexed spender,
-        uint256 value
-    );
+    event Approval(address indexed owner, address indexed spender, uint256 value);
 
-    event Rebased(
-        uint256 oldMultiplier,
-        uint256 newMultiplier
-    );
+    event Rebased(uint256 oldMultiplier, uint256 newMultiplier);
 
-    constructor(
-        string memory _name,
-        string memory _symbol
-    ) {
-        name =
-            _name;
+    constructor(string memory _name, string memory _symbol) {
+        name = _name;
 
-        symbol =
-            _symbol;
+        symbol = _symbol;
     }
 
-    function totalSupply()
-        public
-        view
-        returns (uint256)
-    {
-        return
-            totalShares *
-            multiplier /
-            BASE;
+    function totalSupply() public view returns (uint256) {
+        return totalShares * multiplier / BASE;
     }
 
-    function balanceOf(
-        address user
-    )
-        public
-        view
-        returns (uint256)
-    {
-        return
-            shares[user] *
-            multiplier /
-            BASE;
+    function balanceOf(address user) public view returns (uint256) {
+        return shares[user] * multiplier / BASE;
     }
 
-    function shareBalanceOf(
-        address user
-    )
-        external
-        view
-        returns (uint256)
-    {
+    function shareBalanceOf(address user) external view returns (uint256) {
         return shares[user];
     }
 
-    function mint(
-        address to,
-        uint256 amount
-    )
-        external
-    {
-        require(
-            to != address(0),
-            "ZERO_ADDRESS"
-        );
+    function mint(address to, uint256 amount) external {
+        require(to != address(0), "ZERO_ADDRESS");
 
-        uint256 shareAmount =
-            amount *
-            BASE /
-            multiplier;
+        uint256 shareAmount = amount * BASE / multiplier;
 
-        require(
-            shareAmount != 0 || amount == 0,
-            "AMOUNT_TOO_SMALL"
-        );
+        require(shareAmount != 0 || amount == 0, "AMOUNT_TOO_SMALL");
 
-        shares[to] +=
-            shareAmount;
+        shares[to] += shareAmount;
 
-        totalShares +=
-            shareAmount;
+        totalShares += shareAmount;
 
-        emit Transfer(
-            address(0),
-            to,
-            amount
-        );
+        emit Transfer(address(0), to, amount);
     }
 
-    function transfer(
-        address to,
-        uint256 amount
-    )
-        external
-        returns (bool)
-    {
-        _transfer(
-            msg.sender,
-            to,
-            amount
-        );
+    function transfer(address to, uint256 amount) external returns (bool) {
+        _transfer(msg.sender, to, amount);
 
         return true;
     }
 
-    function approve(
-        address spender,
-        uint256 amount
-    )
-        external
-        returns (bool)
-    {
-        allowance[msg.sender][spender] =
-            amount;
+    function approve(address spender, uint256 amount) external returns (bool) {
+        allowance[msg.sender][spender] = amount;
 
-        emit Approval(
-            msg.sender,
-            spender,
-            amount
-        );
+        emit Approval(msg.sender, spender, amount);
 
         return true;
     }
 
-    function transferFrom(
-        address from,
-        address to,
-        uint256 amount
-    )
-        external
-        returns (bool)
-    {
-        uint256 allowed =
-            allowance[from][msg.sender];
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+        uint256 allowed = allowance[from][msg.sender];
 
-        require(
-            allowed >= amount,
-            "ALLOWANCE"
-        );
+        require(allowed >= amount, "ALLOWANCE");
 
-        if (
-            allowed !=
-            type(uint256).max
-        ) {
+        if (allowed != type(uint256).max) {
             unchecked {
-                allowance[from][msg.sender] =
-                    allowed - amount;
+                allowance[from][msg.sender] = allowed - amount;
             }
 
-            emit Approval(
-                from,
-                msg.sender,
-                allowance[from][msg.sender]
-            );
+            emit Approval(from, msg.sender, allowance[from][msg.sender]);
         }
 
-        _transfer(
-            from,
-            to,
-            amount
-        );
+        _transfer(from, to, amount);
 
         return true;
     }
 
-    function rebase(
-        uint256 newMultiplier
-    )
-        external
-    {
-        require(
-            newMultiplier != 0,
-            "ZERO"
-        );
+    function rebase(uint256 newMultiplier) external {
+        require(newMultiplier != 0, "ZERO");
 
-        uint256 oldMultiplier =
-            multiplier;
+        uint256 oldMultiplier = multiplier;
 
-        multiplier =
-            newMultiplier;
+        multiplier = newMultiplier;
 
-        emit Rebased(
-            oldMultiplier,
-            newMultiplier
-        );
+        emit Rebased(oldMultiplier, newMultiplier);
     }
 
-    function _transfer(
-        address from,
-        address to,
-        uint256 amount
-    )
-        internal
-    {
-        require(
-            to != address(0),
-            "ZERO_ADDRESS"
-        );
+    function _transfer(address from, address to, uint256 amount) internal {
+        require(to != address(0), "ZERO_ADDRESS");
 
-        uint256 shareAmount =
-            amount *
-            BASE /
-            multiplier;
+        uint256 shareAmount = amount * BASE / multiplier;
 
-        require(
-            shareAmount != 0 || amount == 0,
-            "AMOUNT_TOO_SMALL"
-        );
+        require(shareAmount != 0 || amount == 0, "AMOUNT_TOO_SMALL");
 
-        require(
-            shares[from] >=
-                shareAmount,
-            "BALANCE"
-        );
+        require(shares[from] >= shareAmount, "BALANCE");
 
         unchecked {
-            shares[from] -=
-                shareAmount;
+            shares[from] -= shareAmount;
         }
 
-        shares[to] +=
-            shareAmount;
+        shares[to] += shareAmount;
 
-        emit Transfer(
-            from,
-            to,
-            amount
-        );
+        emit Transfer(from, to, amount);
     }
 }

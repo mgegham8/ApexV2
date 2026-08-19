@@ -32,16 +32,7 @@ contract ApexV2FullFuzzHandler is Test {
         token0.approve(address(router), amount0);
         token1.approve(address(router), amount1);
 
-        try router.addLiquidity(
-            address(token0),
-            address(token1),
-            amount0,
-            amount1,
-            0,
-            0,
-            msg.sender,
-            block.timestamp
-        ) {
+        try router.addLiquidity(address(token0), address(token1), amount0, amount1, 0, 0, msg.sender, block.timestamp) {
             actionCount++;
         } catch {}
     }
@@ -54,13 +45,7 @@ contract ApexV2FullFuzzHandler is Test {
         pair.approve(address(router), liquidityAmount);
 
         try router.removeLiquidity(
-            address(token0),
-            address(token1),
-            liquidityAmount,
-            0,
-            0,
-            msg.sender,
-            block.timestamp
+            address(token0), address(token1), liquidityAmount, 0, 0, msg.sender, block.timestamp
         ) {
             actionCount++;
         } catch {}
@@ -77,13 +62,7 @@ contract ApexV2FullFuzzHandler is Test {
         path[0] = zeroToOne ? address(token0) : address(token1);
         path[1] = zeroToOne ? address(token1) : address(token0);
 
-        try router.swapExactTokensForTokens(
-            amountIn,
-            0,
-            path,
-            msg.sender,
-            block.timestamp
-        ) {
+        try router.swapExactTokensForTokens(amountIn, 0, path, msg.sender, block.timestamp) {
             actionCount++;
         } catch {}
     }

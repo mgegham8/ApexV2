@@ -17,9 +17,9 @@ contract ApexV2RouterSwapMoreEdgeCasesTest is Test {
 
     function setUp() public {
         factory = new ApexV2Factory(address(this));
-        
+
         weth = new MockERC20("Wrapped Ether", "WETH");
-        router = new ApexV2Router(address(factory), address(weth)); 
+        router = new ApexV2Router(address(factory), address(weth));
 
         tokenA = new MockERC20("Token A", "TKNA");
         tokenB = new MockERC20("Token B", "TKNB");
@@ -42,14 +42,8 @@ contract ApexV2RouterSwapMoreEdgeCasesTest is Test {
         path[2] = address(tokenA);
 
         vm.startPrank(user);
-        vm.expectRevert(); 
-        router.swapExactTokensForTokens(
-            100e18, 
-            1, 
-            path, 
-            user, 
-            block.timestamp + 100
-        );
+        vm.expectRevert();
+        router.swapExactTokensForTokens(100e18, 1, path, user, block.timestamp + 100);
         vm.stopPrank();
     }
 
@@ -59,14 +53,8 @@ contract ApexV2RouterSwapMoreEdgeCasesTest is Test {
         path[1] = address(tokenB);
 
         vm.startPrank(user);
-        vm.expectRevert(); 
-        router.swapExactTokensForTokens(
-            10e18, 
-            type(uint256).max, 
-            path, 
-            user, 
-            block.timestamp + 100
-        );
+        vm.expectRevert();
+        router.swapExactTokensForTokens(10e18, type(uint256).max, path, user, block.timestamp + 100);
         vm.stopPrank();
     }
 }

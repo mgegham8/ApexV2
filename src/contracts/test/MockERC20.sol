@@ -9,202 +9,97 @@ contract MockERC20 {
 
     uint256 public totalSupply;
 
-    mapping(address => uint256)
-        public balanceOf;
+    mapping(address => uint256) public balanceOf;
 
-    mapping(address => mapping(address => uint256))
-        public allowance;
+    mapping(address => mapping(address => uint256)) public allowance;
 
-    event Transfer(
-        address indexed from,
-        address indexed to,
-        uint256 value
-    );
+    event Transfer(address indexed from, address indexed to, uint256 value);
 
-    event Approval(
-        address indexed owner,
-        address indexed spender,
-        uint256 value
-    );
+    event Approval(address indexed owner, address indexed spender, uint256 value);
 
-    constructor(
-        string memory _name,
-        string memory _symbol
-    ) {
-        name =
-            _name;
+    constructor(string memory _name, string memory _symbol) {
+        name = _name;
 
-        symbol =
-            _symbol;
+        symbol = _symbol;
     }
 
-    function transfer(
-        address to,
-        uint256 amount
-    )
-        external
-        returns (bool)
-    {
-        require(
-            to != address(0),
-            "ZERO_ADDRESS"
-        );
+    function transfer(address to, uint256 amount) external returns (bool) {
+        require(to != address(0), "ZERO_ADDRESS");
 
-        uint256 balance =
-            balanceOf[msg.sender];
+        uint256 balance = balanceOf[msg.sender];
 
-        require(
-            balance >= amount,
-            "BALANCE_LOW"
-        );
+        require(balance >= amount, "BALANCE_LOW");
 
         unchecked {
-            balanceOf[msg.sender] =
-                balance - amount;
+            balanceOf[msg.sender] = balance - amount;
         }
 
-        balanceOf[to] +=
-            amount;
+        balanceOf[to] += amount;
 
-        emit Transfer(
-            msg.sender,
-            to,
-            amount
-        );
+        emit Transfer(msg.sender, to, amount);
 
         return true;
     }
 
-    function approve(
-        address spender,
-        uint256 amount
-    )
-        external
-        returns (bool)
-    {
-        allowance[msg.sender][spender] =
-            amount;
+    function approve(address spender, uint256 amount) external returns (bool) {
+        allowance[msg.sender][spender] = amount;
 
-        emit Approval(
-            msg.sender,
-            spender,
-            amount
-        );
+        emit Approval(msg.sender, spender, amount);
 
         return true;
     }
 
-    function transferFrom(
-        address from,
-        address to,
-        uint256 amount
-    )
-        external
-        returns (bool)
-    {
-        require(
-            to != address(0),
-            "ZERO_ADDRESS"
-        );
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+        require(to != address(0), "ZERO_ADDRESS");
 
-        uint256 balance =
-            balanceOf[from];
+        uint256 balance = balanceOf[from];
 
-        require(
-            balance >= amount,
-            "BALANCE_LOW"
-        );
+        require(balance >= amount, "BALANCE_LOW");
 
-        uint256 allowed =
-            allowance[from][msg.sender];
+        uint256 allowed = allowance[from][msg.sender];
 
-        require(
-            allowed >= amount,
-            "ALLOWANCE_LOW"
-        );
+        require(allowed >= amount, "ALLOWANCE_LOW");
 
-        if (
-            allowed !=
-            type(uint256).max
-        ) {
+        if (allowed != type(uint256).max) {
             unchecked {
-                allowance[from][msg.sender] =
-                    allowed - amount;
+                allowance[from][msg.sender] = allowed - amount;
             }
 
-            emit Approval(
-                from,
-                msg.sender,
-                allowance[from][msg.sender]
-            );
+            emit Approval(from, msg.sender, allowance[from][msg.sender]);
         }
 
         unchecked {
-            balanceOf[from] =
-                balance - amount;
+            balanceOf[from] = balance - amount;
         }
 
-        balanceOf[to] +=
-            amount;
+        balanceOf[to] += amount;
 
-        emit Transfer(
-            from,
-            to,
-            amount
-        );
+        emit Transfer(from, to, amount);
 
         return true;
     }
 
-    function mint(
-        address to,
-        uint256 amount
-    )
-        external
-    {
-        require(
-            to != address(0),
-            "ZERO_ADDRESS"
-        );
+    function mint(address to, uint256 amount) external {
+        require(to != address(0), "ZERO_ADDRESS");
 
-        balanceOf[to] +=
-            amount;
+        balanceOf[to] += amount;
 
-        totalSupply +=
-            amount;
+        totalSupply += amount;
 
-        emit Transfer(
-            address(0),
-            to,
-            amount
-        );
+        emit Transfer(address(0), to, amount);
     }
 
-    function burn(
-        uint256 amount
-    )
-        external
-    {
-        uint256 balance =
-            balanceOf[msg.sender];
+    function burn(uint256 amount) external {
+        uint256 balance = balanceOf[msg.sender];
 
-        require(
-            balance >= amount,
-            "BALANCE_LOW"
-        );
+        require(balance >= amount, "BALANCE_LOW");
 
         unchecked {
-            balanceOf[msg.sender] =
-                balance - amount;
+            balanceOf[msg.sender] = balance - amount;
         }
 
-        totalSupply -=
-            amount;
+        totalSupply -= amount;
 
-        emit Transfer(
-            msg.sender,
-            address(0),
-            amount
-        );
+        emit Transfer(msg.sender, address(0), amount);
     }
 }

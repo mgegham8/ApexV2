@@ -13,35 +13,15 @@ interface IApexLaunchRouter {
         uint256 amountETHMin,
         address to,
         uint256 deadline
-    )
-        external
-        payable
-        returns (
-            uint256 amountToken,
-            uint256 amountETH,
-            uint256 liquidity
-        );
+    ) external payable returns (uint256 amountToken, uint256 amountETH, uint256 liquidity);
 }
 
 interface IApexLaunchFactory {
-    function getPair(
-        address tokenA,
-        address tokenB
-    )
-        external
-        view
-        returns (address pair);
+    function getPair(address tokenA, address tokenB) external view returns (address pair);
 }
 
 interface IApexLaunchVesting {
-    function createVesting(
-        address user,
-        uint256 amount,
-        uint256 startTime,
-        uint256 cliff,
-        uint256 duration
-    )
-        external;
+    function createVesting(address user, uint256 amount, uint256 startTime, uint256 cliff, uint256 duration) external;
 }
 
 contract ApexLaunchController is ReentrancyGuard {
@@ -109,29 +89,13 @@ contract ApexLaunchController is ReentrancyGuard {
     // EVENTS
     // ============================================================
 
-    event Launched(
-        address indexed pair,
-        uint256 amountToken,
-        uint256 amountETH,
-        uint256 liquidity
-    );
+    event Launched(address indexed pair, uint256 amountToken, uint256 amountETH, uint256 liquidity);
 
-    event VestingCreated(
-        address indexed user,
-        uint256 amount,
-        uint256 cliff,
-        uint256 duration
-    );
+    event VestingCreated(address indexed user, uint256 amount, uint256 cliff, uint256 duration);
 
-    event OwnershipTransferStarted(
-        address indexed oldOwner,
-        address indexed pendingOwner
-    );
+    event OwnershipTransferStarted(address indexed oldOwner, address indexed pendingOwner);
 
-    event OwnershipTransferred(
-        address indexed oldOwner,
-        address indexed newOwner
-    );
+    event OwnershipTransferred(address indexed oldOwner, address indexed newOwner);
 
     // ============================================================
     // MODIFIERS
@@ -149,12 +113,7 @@ contract ApexLaunchController is ReentrancyGuard {
     // CONSTRUCTOR
     // ============================================================
 
-    constructor(
-        address _token,
-        address _router,
-        address _factory,
-        address _vesting
-    ) {
+    constructor(address _token, address _router, address _factory, address _vesting) {
         if (_token == address(0)) {
             revert ZeroToken();
         }
@@ -199,10 +158,7 @@ contract ApexLaunchController is ReentrancyGuard {
     // RECEIVE ETH
     // ============================================================
 
-    receive()
-        external
-        payable
-    {
+    receive() external payable {
         /*
          * Router may refund excess ETH during addLiquidityETH().
          * Arbitrary direct ETH transfers are rejected.
@@ -216,16 +172,7 @@ contract ApexLaunchController is ReentrancyGuard {
     // LAUNCH
     // ============================================================
 
-    function launch(
-        address weth,
-        uint256 tokenAmount,
-        uint256 ethAmount
-    )
-        external
-        payable
-        onlyOwner
-        nonReentrant
-    {
+    function launch(address weth, uint256 tokenAmount, uint256 ethAmount) external payable onlyOwner nonReentrant {
         if (launched) {
             revert AlreadyLaunched();
         }
@@ -250,10 +197,7 @@ contract ApexLaunchController is ReentrancyGuard {
             revert WrongETHAmount();
         }
 
-        if (
-            IERC20(token).balanceOf(address(this)) <
-            tokenAmount
-        ) {
+        if (IERC20(token).balanceOf(address(this)) < tokenAmount) {
             revert InsufficientTokenBalance();
         }
 
@@ -262,12 +206,7 @@ contract ApexLaunchController is ReentrancyGuard {
          * Do not silently join an already-existing market whose
          * price may already have been manipulated.
          */
-        if (
-            IApexLaunchFactory(factory).getPair(
-                token,
-                weth
-            ) != address(0)
-        ) {
+        if (IApexLaunchFactory(factory).getPair(token, weth) != address(0)) {
             revert PairAlreadyExists();
         }
 
@@ -277,37 +216,18 @@ contract ApexLaunchController is ReentrancyGuard {
          */
         launched = true;
 
-        IERC20(token).forceApprove(
-            router,
-            tokenAmount
-        );
+        IERC20(token).forceApprove(router, tokenAmount);
 
-        (
-            uint256 amountToken,
-            uint256 amountETH,
-            uint256 liquidity
-        ) =
-            IApexLaunchRouter(router)
-                .addLiquidityETH{
-                    value: ethAmount
-                }(
-                    token,
-                    tokenAmount,
-                    0,
-                    0,
-                    address(this),
-                    block.timestamp + 1 hours
-                );
+        (uint256 amountToken, uint256 amountETH, uint256 liquidity) = IApexLaunchRouter(router)
+        .addLiquidityETH{value: ethAmount}(
+            token, tokenAmount, 0, 0, address(this), block.timestamp + 1 hours
+        );
 
         if (liquidity == 0) {
             revert NoLiquidity();
         }
 
-        address pair =
-            IApexLaunchFactory(factory).getPair(
-                token,
-                weth
-            );
+        address pair = IApexLaunchFactory(factory).getPair(token, weth);
 
         if (pair == address(0)) {
             revert PairNotCreated();
@@ -318,29 +238,16 @@ contract ApexLaunchController is ReentrancyGuard {
         /*
          * Remove residual approval after launch.
          */
-        IERC20(token).forceApprove(
-            router,
-            0
-        );
+        IERC20(token).forceApprove(router, 0);
 
-        emit Launched(
-            pair,
-            amountToken,
-            amountETH,
-            liquidity
-        );
+        emit Launched(pair, amountToken, amountETH, liquidity);
     }
 
     // ============================================================
     // VESTING
     // ============================================================
 
-    function createVesting(
-        address user,
-        uint256 amount,
-        uint256 cliff,
-        uint256 duration
-    )
+    function createVesting(address user, uint256 amount, uint256 cliff, uint256 duration)
         external
         onlyOwner
         nonReentrant
@@ -361,33 +268,16 @@ contract ApexLaunchController is ReentrancyGuard {
             revert InvalidCliff();
         }
 
-        IApexLaunchVesting(vesting)
-            .createVesting(
-                user,
-                amount,
-                block.timestamp,
-                cliff,
-                duration
-            );
+        IApexLaunchVesting(vesting).createVesting(user, amount, block.timestamp, cliff, duration);
 
-        emit VestingCreated(
-            user,
-            amount,
-            cliff,
-            duration
-        );
+        emit VestingCreated(user, amount, cliff, duration);
     }
 
     // ============================================================
     // OWNERSHIP
     // ============================================================
 
-    function transferOwnership(
-        address newOwner
-    )
-        external
-        onlyOwner
-    {
+    function transferOwnership(address newOwner) external onlyOwner {
         if (newOwner == address(0)) {
             revert ZeroOwner();
         }
@@ -396,37 +286,24 @@ contract ApexLaunchController is ReentrancyGuard {
             revert SameOwner();
         }
 
-        pendingOwner =
-            newOwner;
+        pendingOwner = newOwner;
 
-        emit OwnershipTransferStarted(
-            owner,
-            newOwner
-        );
+        emit OwnershipTransferStarted(owner, newOwner);
     }
 
-    function acceptOwnership()
-        external
-    {
-        address newOwner =
-            pendingOwner;
+    function acceptOwnership() external {
+        address newOwner = pendingOwner;
 
         if (msg.sender != newOwner) {
             revert NotPendingOwner();
         }
 
-        address oldOwner =
-            owner;
+        address oldOwner = owner;
 
-        owner =
-            newOwner;
+        owner = newOwner;
 
-        pendingOwner =
-            address(0);
+        pendingOwner = address(0);
 
-        emit OwnershipTransferred(
-            oldOwner,
-            newOwner
-        );
+        emit OwnershipTransferred(oldOwner, newOwner);
     }
 }

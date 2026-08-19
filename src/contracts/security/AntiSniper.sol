@@ -43,33 +43,18 @@ contract AntiSniper {
     // ============================================================
 
     event LaunchStarted(
-        uint256 indexed blockNumber,
-        uint256 protectionBlocks,
-        uint256 maxBuyAmount,
-        uint256 maxWalletAmount
+        uint256 indexed blockNumber, uint256 protectionBlocks, uint256 maxBuyAmount, uint256 maxWalletAmount
     );
 
     event ProtectionDisabled();
 
-    event BlacklistUpdated(
-        address indexed account,
-        bool status
-    );
+    event BlacklistUpdated(address indexed account, bool status);
 
-    event WhitelistUpdated(
-        address indexed account,
-        bool status
-    );
+    event WhitelistUpdated(address indexed account, bool status);
 
-    event LimitsUpdated(
-        uint256 maxBuy,
-        uint256 maxWallet
-    );
+    event LimitsUpdated(uint256 maxBuy, uint256 maxWallet);
 
-    event OwnershipTransferred(
-        address indexed oldOwner,
-        address indexed newOwner
-    );
+    event OwnershipTransferred(address indexed oldOwner, address indexed newOwner);
 
     // ============================================================
     // MODIFIERS
@@ -95,11 +80,7 @@ contract AntiSniper {
     // LAUNCH
     // ============================================================
 
-    function startLaunch(
-        uint256 _protectionBlocks,
-        uint256 _maxBuyAmount,
-        uint256 _maxWalletAmount
-    )
+    function startLaunch(uint256 _protectionBlocks, uint256 _maxBuyAmount, uint256 _maxWalletAmount)
         external
         onlyOwner
     {
@@ -123,46 +104,31 @@ contract AntiSniper {
             revert MaxBuyGreaterThanMaxWallet();
         }
 
-        launchBlock =
-            block.number;
+        launchBlock = block.number;
 
-        protectionBlocks =
-            _protectionBlocks;
+        protectionBlocks = _protectionBlocks;
 
-        maxBuyAmount =
-            _maxBuyAmount;
+        maxBuyAmount = _maxBuyAmount;
 
-        maxWalletAmount =
-            _maxWalletAmount;
+        maxWalletAmount = _maxWalletAmount;
 
-        launchStarted =
-            true;
+        launchStarted = true;
 
-        protectionEnabled =
-            true;
+        protectionEnabled = true;
 
-        emit LaunchStarted(
-            block.number,
-            _protectionBlocks,
-            _maxBuyAmount,
-            _maxWalletAmount
-        );
+        emit LaunchStarted(block.number, _protectionBlocks, _maxBuyAmount, _maxWalletAmount);
     }
 
     // ============================================================
     // PROTECTION
     // ============================================================
 
-    function disableProtection()
-        external
-        onlyOwner
-    {
+    function disableProtection() external onlyOwner {
         if (!protectionEnabled) {
             revert ProtectionNotEnabled();
         }
 
-        protectionEnabled =
-            false;
+        protectionEnabled = false;
 
         emit ProtectionDisabled();
     }
@@ -171,61 +137,35 @@ contract AntiSniper {
     // BLACKLIST
     // ============================================================
 
-    function setBlacklist(
-        address account,
-        bool status
-    )
-        external
-        onlyOwner
-    {
+    function setBlacklist(address account, bool status) external onlyOwner {
         if (account == address(0)) {
             revert ZeroAddress();
         }
 
-        blacklist[account] =
-            status;
+        blacklist[account] = status;
 
-        emit BlacklistUpdated(
-            account,
-            status
-        );
+        emit BlacklistUpdated(account, status);
     }
 
     // ============================================================
     // WHITELIST
     // ============================================================
 
-    function setWhitelist(
-        address account,
-        bool status
-    )
-        external
-        onlyOwner
-    {
+    function setWhitelist(address account, bool status) external onlyOwner {
         if (account == address(0)) {
             revert ZeroAddress();
         }
 
-        whitelist[account] =
-            status;
+        whitelist[account] = status;
 
-        emit WhitelistUpdated(
-            account,
-            status
-        );
+        emit WhitelistUpdated(account, status);
     }
 
     // ============================================================
     // LIMITS
     // ============================================================
 
-    function setLimits(
-        uint256 _maxBuyAmount,
-        uint256 _maxWalletAmount
-    )
-        external
-        onlyOwner
-    {
+    function setLimits(uint256 _maxBuyAmount, uint256 _maxWalletAmount) external onlyOwner {
         if (_maxBuyAmount == 0) {
             revert InvalidMaxBuy();
         }
@@ -238,31 +178,18 @@ contract AntiSniper {
             revert MaxBuyGreaterThanMaxWallet();
         }
 
-        maxBuyAmount =
-            _maxBuyAmount;
+        maxBuyAmount = _maxBuyAmount;
 
-        maxWalletAmount =
-            _maxWalletAmount;
+        maxWalletAmount = _maxWalletAmount;
 
-        emit LimitsUpdated(
-            _maxBuyAmount,
-            _maxWalletAmount
-        );
+        emit LimitsUpdated(_maxBuyAmount, _maxWalletAmount);
     }
 
     // ============================================================
     // BUY VALIDATION
     // ============================================================
 
-    function checkBuy(
-        address buyer,
-        uint256 amount,
-        uint256 currentWalletBalance
-    )
-        external
-        view
-        returns (bool)
-    {
+    function checkBuy(address buyer, uint256 amount, uint256 currentWalletBalance) external view returns (bool) {
         if (buyer == address(0)) {
             revert ZeroAddress();
         }
@@ -302,19 +229,11 @@ contract AntiSniper {
             revert MaxBuyExceeded();
         }
 
-        if (
-            amount >
-            type(uint256).max -
-                currentWalletBalance
-        ) {
+        if (amount > type(uint256).max - currentWalletBalance) {
             revert WalletBalanceOverflow();
         }
 
-        if (
-            currentWalletBalance +
-                amount >
-            maxWalletAmount
-        ) {
+        if (currentWalletBalance + amount > maxWalletAmount) {
             revert MaxWalletExceeded();
         }
 
@@ -325,56 +244,31 @@ contract AntiSniper {
     // VIEW HELPERS
     // ============================================================
 
-    function isProtectionActive()
-        external
-        view
-        returns (bool)
-    {
+    function isProtectionActive() external view returns (bool) {
         return _isProtectionActive();
     }
 
-    function protectionEndBlock()
-        external
-        view
-        returns (uint256)
-    {
+    function protectionEndBlock() external view returns (uint256) {
         if (!launchStarted) {
             return 0;
         }
 
-        return
-            launchBlock +
-            protectionBlocks;
+        return launchBlock + protectionBlocks;
     }
 
-    function _isProtectionActive()
-        internal
-        view
-        returns (bool)
-    {
-        if (
-            !launchStarted ||
-            !protectionEnabled
-        ) {
+    function _isProtectionActive() internal view returns (bool) {
+        if (!launchStarted || !protectionEnabled) {
             return false;
         }
 
-        return
-            block.number <=
-            launchBlock +
-                protectionBlocks;
+        return block.number <= launchBlock + protectionBlocks;
     }
 
     // ============================================================
     // OWNERSHIP
     // ============================================================
 
-    function transferOwnership(
-        address newOwner
-    )
-        external
-        onlyOwner
-    {
+    function transferOwnership(address newOwner) external onlyOwner {
         if (newOwner == address(0)) {
             revert ZeroAddress();
         }
@@ -383,15 +277,10 @@ contract AntiSniper {
             revert SameOwner();
         }
 
-        address oldOwner =
-            owner;
+        address oldOwner = owner;
 
-        owner =
-            newOwner;
+        owner = newOwner;
 
-        emit OwnershipTransferred(
-            oldOwner,
-            newOwner
-        );
+        emit OwnershipTransferred(oldOwner, newOwner);
     }
 }

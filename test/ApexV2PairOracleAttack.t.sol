@@ -42,17 +42,17 @@ contract ApexV2PairOracleAttackTest is Test {
     }
 
     function testOracleCannotChangeWithoutTime() public {
-        uint price0Before = pair.price0CumulativeLast();
-        uint price1Before = pair.price1CumulativeLast();
+        uint256 price0Before = pair.price0CumulativeLast();
+        uint256 price1Before = pair.price1CumulativeLast();
 
-        (, , uint32 timestampBefore) = pair.getReserves();
+        (,, uint32 timestampBefore) = pair.getReserves();
 
         pair.sync();
 
-        uint price0After = pair.price0CumulativeLast();
-        uint price1After = pair.price1CumulativeLast();
+        uint256 price0After = pair.price0CumulativeLast();
+        uint256 price1After = pair.price1CumulativeLast();
 
-        (, , uint32 timestampAfter) = pair.getReserves();
+        (,, uint32 timestampAfter) = pair.getReserves();
 
         assertEq(price0Before, price0After);
         assertEq(price1Before, price1After);
@@ -60,15 +60,15 @@ contract ApexV2PairOracleAttackTest is Test {
     }
 
     function testOracleUpdatesAfterTimePasses() public {
-        uint price0Before = pair.price0CumulativeLast();
-        uint price1Before = pair.price1CumulativeLast();
+        uint256 price0Before = pair.price0CumulativeLast();
+        uint256 price1Before = pair.price1CumulativeLast();
 
         vm.warp(block.timestamp + 1 hours);
 
         pair.sync();
 
-        uint price0After = pair.price0CumulativeLast();
-        uint price1After = pair.price1CumulativeLast();
+        uint256 price0After = pair.price0CumulativeLast();
+        uint256 price1After = pair.price1CumulativeLast();
 
         assertGt(price0After, price0Before);
         assertGt(price1After, price1Before);

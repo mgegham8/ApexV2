@@ -2,18 +2,9 @@
 pragma solidity 0.8.28;
 
 interface IApexV2Pair {
-    event Mint(
-        address indexed sender,
-        uint256 amount0,
-        uint256 amount1
-    );
+    event Mint(address indexed sender, uint256 amount0, uint256 amount1);
 
-    event Burn(
-        address indexed sender,
-        uint256 amount0,
-        uint256 amount1,
-        address indexed to
-    );
+    event Burn(address indexed sender, uint256 amount0, uint256 amount1, address indexed to);
 
     event Swap(
         address indexed sender,
@@ -24,89 +15,33 @@ interface IApexV2Pair {
         address indexed to
     );
 
-    event Sync(
-        uint112 reserve0,
-        uint112 reserve1
-    );
+    event Sync(uint112 reserve0, uint112 reserve1);
 
-    function MINIMUM_LIQUIDITY()
-        external
-        pure
-        returns (uint256);
+    function MINIMUM_LIQUIDITY() external pure returns (uint256);
 
-    function factory()
-        external
-        view
-        returns (address);
+    function factory() external view returns (address);
 
-    function token0()
-        external
-        view
-        returns (address);
+    function token0() external view returns (address);
 
-    function token1()
-        external
-        view
-        returns (address);
+    function token1() external view returns (address);
 
-    function getReserves()
-        external
-        view
-        returns (
-            uint112 reserve0,
-            uint112 reserve1,
-            uint32 blockTimestampLast
-        );
+    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
 
-    function price0CumulativeLast()
-        external
-        view
-        returns (uint256);
+    function price0CumulativeLast() external view returns (uint256);
 
-    function price1CumulativeLast()
-        external
-        view
-        returns (uint256);
+    function price1CumulativeLast() external view returns (uint256);
 
-    function kLast()
-        external
-        view
-        returns (uint256);
+    function kLast() external view returns (uint256);
 
-    function initialize(
-        address _token0,
-        address _token1
-    )
-        external;
+    function initialize(address _token0, address _token1) external;
 
-    function mint(
-        address to
-    )
-        external
-        returns (uint256 liquidity);
+    function mint(address to) external returns (uint256 liquidity);
 
-    function burn(
-        address to
-    )
-        external
-        returns (
-            uint256 amount0,
-            uint256 amount1
-        );
+    function burn(address to) external returns (uint256 amount0, uint256 amount1);
 
-    function swap(
-        uint256 amount0Out,
-        uint256 amount1Out,
-        address to,
-        bytes calldata data
-    )
-        external;
+    function swap(uint256 amount0Out, uint256 amount1Out, address to, bytes calldata data) external;
 
-    function skim(
-        address to
-    )
-        external;
+    function skim(address to) external;
 
-    function sync()
-        external;
+    function sync() external;
 }

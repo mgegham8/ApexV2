@@ -7,124 +7,50 @@ import "../src/contracts/libraries/SafeTransfer.sol";
 import "../src/contracts/test/MockERC20.sol";
 
 contract SafeTransferHarness {
-    function safeTransferFrom(
-        address token,
-        address from,
-        address to,
-        uint256 amount
-    )
-        external
-    {
-        SafeTransfer.safeTransferFrom(
-            token,
-            from,
-            to,
-            amount
-        );
+    function safeTransferFrom(address token, address from, address to, uint256 amount) external {
+        SafeTransfer.safeTransferFrom(token, from, to, amount);
     }
 
-    function safeTransfer(
-        address token,
-        address to,
-        uint256 amount
-    )
-        external
-    {
-        SafeTransfer.safeTransfer(
-            token,
-            to,
-            amount
-        );
+    function safeTransfer(address token, address to, uint256 amount) external {
+        SafeTransfer.safeTransfer(token, to, amount);
     }
 }
 
 contract FalseReturnToken {
-    function transfer(
-        address,
-        uint256
-    )
-        external
-        pure
-        returns (bool)
-    {
+    function transfer(address, uint256) external pure returns (bool) {
         return false;
     }
 
-    function transferFrom(
-        address,
-        address,
-        uint256
-    )
-        external
-        pure
-        returns (bool)
-    {
+    function transferFrom(address, address, uint256) external pure returns (bool) {
         return false;
     }
 }
 
 contract NoReturnToken {
-    function transfer(
-        address,
-        uint256
-    )
-        external
-    {}
+    function transfer(address, uint256) external {}
 
-    function transferFrom(
-        address,
-        address,
-        uint256
-    )
-        external
-    {}
+    function transferFrom(address, address, uint256) external {}
 }
 
 contract RevertingToken {
-    function transfer(
-        address,
-        uint256
-    )
-        external
-        pure
-    {
+    function transfer(address, uint256) external pure {
         revert("TOKEN_REVERT");
     }
 
-    function transferFrom(
-        address,
-        address,
-        uint256
-    )
-        external
-        pure
-    {
+    function transferFrom(address, address, uint256) external pure {
         revert("TOKEN_REVERT");
     }
 }
 
 contract BadReturnToken {
-    function transfer(
-        address,
-        uint256
-    )
-        external
-        pure
-    {
+    function transfer(address, uint256) external pure {
         assembly {
             mstore(0x00, 0x01)
             return(0x00, 1)
         }
     }
 
-    function transferFrom(
-        address,
-        address,
-        uint256
-    )
-        external
-        pure
-    {
+    function transferFrom(address, address, uint256) external pure {
         assembly {
             mstore(0x00, 0x01)
             return(0x00, 1)
@@ -141,260 +67,125 @@ contract SafeTransferTest is Test {
 
     uint256 constant AMOUNT = 100 ether;
 
-    function setUp()
-        public
-    {
-        harness =
-            new SafeTransferHarness();
+    function setUp() public {
+        harness = new SafeTransferHarness();
 
-        token =
-            new MockERC20(
-                "Mock Token",
-                "MOCK"
-            );
+        token = new MockERC20("Mock Token", "MOCK");
 
-        alice =
-            address(0xA11CE);
+        alice = address(0xA11CE);
 
-        bob =
-            address(0xB0B);
+        bob = address(0xB0B);
 
-        token.mint(
-            alice,
-            AMOUNT
-        );
+        token.mint(alice, AMOUNT);
     }
 
     // =============================================================
     // safeTransferFrom
     // =============================================================
 
-    function testSafeTransferFromSuccess()
-        public
-    {
-        vm.prank(
-            alice
-        );
+    function testSafeTransferFromSuccess() public {
+        vm.prank(alice);
 
-        token.approve(
-            address(harness),
-            AMOUNT
-        );
+        token.approve(address(harness), AMOUNT);
 
-        harness.safeTransferFrom(
-            address(token),
-            alice,
-            bob,
-            AMOUNT
-        );
+        harness.safeTransferFrom(address(token), alice, bob, AMOUNT);
 
-        assertEq(
-            token.balanceOf(alice),
-            0
-        );
+        assertEq(token.balanceOf(alice), 0);
 
-        assertEq(
-            token.balanceOf(bob),
-            AMOUNT
-        );
+        assertEq(token.balanceOf(bob), AMOUNT);
     }
 
-    function testSafeTransferFromRevertsWhenTokenReverts()
-        public
-    {
-        RevertingToken badToken =
-            new RevertingToken();
+    function testSafeTransferFromRevertsWhenTokenReverts() public {
+        RevertingToken badToken = new RevertingToken();
 
-        vm.expectRevert(
-            SafeTransfer.TransferFromFailed.selector
-        );
+        vm.expectRevert(SafeTransfer.TransferFromFailed.selector);
 
-        harness.safeTransferFrom(
-            address(badToken),
-            alice,
-            bob,
-            AMOUNT
-        );
+        harness.safeTransferFrom(address(badToken), alice, bob, AMOUNT);
     }
 
-    function testSafeTransferFromRevertsOnFalseReturn()
-        public
-    {
-        FalseReturnToken badToken =
-            new FalseReturnToken();
+    function testSafeTransferFromRevertsOnFalseReturn() public {
+        FalseReturnToken badToken = new FalseReturnToken();
 
-        vm.expectRevert(
-            SafeTransfer.TransferFromFailed.selector
-        );
+        vm.expectRevert(SafeTransfer.TransferFromFailed.selector);
 
-        harness.safeTransferFrom(
-            address(badToken),
-            alice,
-            bob,
-            AMOUNT
-        );
+        harness.safeTransferFrom(address(badToken), alice, bob, AMOUNT);
     }
 
-    function testSafeTransferFromAcceptsNoReturnData()
-        public
-    {
-        NoReturnToken noReturnToken =
-            new NoReturnToken();
+    function testSafeTransferFromAcceptsNoReturnData() public {
+        NoReturnToken noReturnToken = new NoReturnToken();
 
-        harness.safeTransferFrom(
-            address(noReturnToken),
-            alice,
-            bob,
-            AMOUNT
-        );
+        harness.safeTransferFrom(address(noReturnToken), alice, bob, AMOUNT);
     }
 
-    function testSafeTransferFromRevertsOnBadReturnData()
-        public
-    {
-        BadReturnToken badToken =
-            new BadReturnToken();
+    function testSafeTransferFromRevertsOnBadReturnData() public {
+        BadReturnToken badToken = new BadReturnToken();
 
-        vm.expectRevert(
-            SafeTransfer.TransferFromFailed.selector
-        );
+        vm.expectRevert(SafeTransfer.TransferFromFailed.selector);
 
-        harness.safeTransferFrom(
-            address(badToken),
-            alice,
-            bob,
-            AMOUNT
-        );
+        harness.safeTransferFrom(address(badToken), alice, bob, AMOUNT);
     }
 
     // =============================================================
     // safeTransfer
     // =============================================================
 
-    function testSafeTransferSuccess()
-        public
-    {
-        vm.prank(
-            alice
-        );
+    function testSafeTransferSuccess() public {
+        vm.prank(alice);
 
-        token.transfer(
-            address(harness),
-            AMOUNT
-        );
+        token.transfer(address(harness), AMOUNT);
 
-        harness.safeTransfer(
-            address(token),
-            bob,
-            AMOUNT
-        );
+        harness.safeTransfer(address(token), bob, AMOUNT);
 
-        assertEq(
-            token.balanceOf(bob),
-            AMOUNT
-        );
+        assertEq(token.balanceOf(bob), AMOUNT);
     }
 
-    function testSafeTransferRevertsWhenTokenReverts()
-        public
-    {
-        RevertingToken badToken =
-            new RevertingToken();
+    function testSafeTransferRevertsWhenTokenReverts() public {
+        RevertingToken badToken = new RevertingToken();
 
-        vm.expectRevert(
-            SafeTransfer.TransferFailed.selector
-        );
+        vm.expectRevert(SafeTransfer.TransferFailed.selector);
 
-        harness.safeTransfer(
-            address(badToken),
-            bob,
-            AMOUNT
-        );
+        harness.safeTransfer(address(badToken), bob, AMOUNT);
     }
 
-    function testSafeTransferRevertsOnFalseReturn()
-        public
-    {
-        FalseReturnToken badToken =
-            new FalseReturnToken();
+    function testSafeTransferRevertsOnFalseReturn() public {
+        FalseReturnToken badToken = new FalseReturnToken();
 
-        vm.expectRevert(
-            SafeTransfer.TransferFailed.selector
-        );
+        vm.expectRevert(SafeTransfer.TransferFailed.selector);
 
-        harness.safeTransfer(
-            address(badToken),
-            bob,
-            AMOUNT
-        );
+        harness.safeTransfer(address(badToken), bob, AMOUNT);
     }
 
-    function testSafeTransferAcceptsNoReturnData()
-        public
-    {
-        NoReturnToken noReturnToken =
-            new NoReturnToken();
+    function testSafeTransferAcceptsNoReturnData() public {
+        NoReturnToken noReturnToken = new NoReturnToken();
 
-        harness.safeTransfer(
-            address(noReturnToken),
-            bob,
-            AMOUNT
-        );
+        harness.safeTransfer(address(noReturnToken), bob, AMOUNT);
     }
 
-    function testSafeTransferRevertsOnBadReturnData()
-        public
-    {
-        BadReturnToken badToken =
-            new BadReturnToken();
+    function testSafeTransferRevertsOnBadReturnData() public {
+        BadReturnToken badToken = new BadReturnToken();
 
-        vm.expectRevert(
-            SafeTransfer.TransferFailed.selector
-        );
+        vm.expectRevert(SafeTransfer.TransferFailed.selector);
 
-        harness.safeTransfer(
-            address(badToken),
-            bob,
-            AMOUNT
-        );
+        harness.safeTransfer(address(badToken), bob, AMOUNT);
     }
 
     // =============================================================
     // no-code token
     // =============================================================
 
-    function testSafeTransferRevertsWhenTokenHasNoCode()
-        public
-    {
-        address noCode =
-            address(0x123456);
+    function testSafeTransferRevertsWhenTokenHasNoCode() public {
+        address noCode = address(0x123456);
 
-        vm.expectRevert(
-            SafeTransfer.TokenHasNoCode.selector
-        );
+        vm.expectRevert(SafeTransfer.TokenHasNoCode.selector);
 
-        harness.safeTransfer(
-            noCode,
-            bob,
-            AMOUNT
-        );
+        harness.safeTransfer(noCode, bob, AMOUNT);
     }
 
-    function testSafeTransferFromRevertsWhenTokenHasNoCode()
-        public
-    {
-        address noCode =
-            address(0x654321);
+    function testSafeTransferFromRevertsWhenTokenHasNoCode() public {
+        address noCode = address(0x654321);
 
-        vm.expectRevert(
-            SafeTransfer.TokenHasNoCode.selector
-        );
+        vm.expectRevert(SafeTransfer.TokenHasNoCode.selector);
 
-        harness.safeTransferFrom(
-            noCode,
-            alice,
-            bob,
-            AMOUNT
-        );
+        harness.safeTransferFrom(noCode, alice, bob, AMOUNT);
     }
 }

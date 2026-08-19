@@ -6,34 +6,16 @@ library SafeTransfer {
     error TransferFromFailed();
     error TokenHasNoCode();
 
-    bytes4 private constant TRANSFER_SELECTOR =
-        0xa9059cbb;
+    bytes4 private constant TRANSFER_SELECTOR = 0xa9059cbb;
 
-    bytes4 private constant TRANSFER_FROM_SELECTOR =
-        0x23b872dd;
+    bytes4 private constant TRANSFER_FROM_SELECTOR = 0x23b872dd;
 
-    function safeTransfer(
-        address token,
-        address to,
-        uint256 value
-    )
-        internal
-    {
+    function safeTransfer(address token, address to, uint256 value) internal {
         if (token.code.length == 0) {
             revert TokenHasNoCode();
         }
 
-        (
-            bool success,
-            bytes memory data
-        ) =
-            token.call(
-                abi.encodeWithSelector(
-                    TRANSFER_SELECTOR,
-                    to,
-                    value
-                )
-            );
+        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(TRANSFER_SELECTOR, to, value));
 
         if (!success) {
             revert TransferFailed();
@@ -44,30 +26,12 @@ library SafeTransfer {
         }
     }
 
-    function safeTransferFrom(
-        address token,
-        address from,
-        address to,
-        uint256 value
-    )
-        internal
-    {
+    function safeTransferFrom(address token, address from, address to, uint256 value) internal {
         if (token.code.length == 0) {
             revert TokenHasNoCode();
         }
 
-        (
-            bool success,
-            bytes memory data
-        ) =
-            token.call(
-                abi.encodeWithSelector(
-                    TRANSFER_FROM_SELECTOR,
-                    from,
-                    to,
-                    value
-                )
-            );
+        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(TRANSFER_FROM_SELECTOR, from, to, value));
 
         if (!success) {
             revert TransferFromFailed();
@@ -78,13 +42,7 @@ library SafeTransfer {
         }
     }
 
-    function _isSuccessfulReturnData(
-        bytes memory data
-    )
-        private
-        pure
-        returns (bool)
-    {
+    function _isSuccessfulReturnData(bytes memory data) private pure returns (bool) {
         if (data.length == 0) {
             return true;
         }
@@ -96,9 +54,7 @@ library SafeTransfer {
         uint256 result;
 
         assembly ("memory-safe") {
-            result := mload(
-                add(data, 0x20)
-            )
+            result := mload(add(data, 0x20))
         }
 
         return result == 1;

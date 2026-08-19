@@ -18,9 +18,9 @@ contract ApexV2RouterSwapEdgeCasesTest is Test {
 
     function setUp() public {
         factory = new ApexV2Factory(address(this));
-        
+
         weth = new MockERC20("Wrapped Ether", "WETH");
-        router = new ApexV2Router(address(factory), address(weth)); 
+        router = new ApexV2Router(address(factory), address(weth));
 
         tokenA = new MockERC20("Token A", "TKNA");
         tokenB = new MockERC20("Token B", "TKNB");
@@ -44,15 +44,9 @@ contract ApexV2RouterSwapEdgeCasesTest is Test {
 
         vm.startPrank(user);
         vm.warp(1000);
-        
+
         vm.expectRevert(bytes("ApexV2Router: EXPIRED"));
-        router.swapExactTokensForTokens(
-            100e18, 
-            1, 
-            path, 
-            user, 
-            999 
-        );
+        router.swapExactTokensForTokens(100e18, 1, path, user, 999);
         vm.stopPrank();
     }
 
@@ -62,62 +56,38 @@ contract ApexV2RouterSwapEdgeCasesTest is Test {
         path[1] = address(tokenB);
 
         vm.startPrank(user);
-        vm.expectRevert(); 
-        router.swapExactTokensForTokens(
-            0, 
-            1, 
-            path, 
-            user, 
-            block.timestamp + 100
-        );
+        vm.expectRevert();
+        router.swapExactTokensForTokens(0, 1, path, user, block.timestamp + 100);
         vm.stopPrank();
     }
 
     function test_RevertWhen_Swap_InvalidPathLength_Zero() public {
-        address[] memory path = new address[](0); 
+        address[] memory path = new address[](0);
 
         vm.startPrank(user);
-        vm.expectRevert(); 
-        router.swapExactTokensForTokens(
-            100e18, 
-            1, 
-            path, 
-            user, 
-            block.timestamp + 100
-        );
+        vm.expectRevert();
+        router.swapExactTokensForTokens(100e18, 1, path, user, block.timestamp + 100);
         vm.stopPrank();
     }
 
     function test_RevertWhen_Swap_InvalidPathLength_One() public {
-        address[] memory path = new address[](1); 
+        address[] memory path = new address[](1);
         path[0] = address(tokenA);
 
         vm.startPrank(user);
-        vm.expectRevert(); 
-        router.swapExactTokensForTokens(
-            100e18, 
-            1, 
-            path, 
-            user, 
-            block.timestamp + 100
-        );
+        vm.expectRevert();
+        router.swapExactTokensForTokens(100e18, 1, path, user, block.timestamp + 100);
         vm.stopPrank();
     }
 
     function test_RevertWhen_Swap_NonExistentPair() public {
         address[] memory path = new address[](2);
         path[0] = address(tokenA);
-        path[1] = address(tokenC); 
+        path[1] = address(tokenC);
 
         vm.startPrank(user);
-        vm.expectRevert(); 
-        router.swapExactTokensForTokens(
-            100e18, 
-            1, 
-            path, 
-            user, 
-            block.timestamp + 100
-        );
+        vm.expectRevert();
+        router.swapExactTokensForTokens(100e18, 1, path, user, block.timestamp + 100);
         vm.stopPrank();
     }
 }

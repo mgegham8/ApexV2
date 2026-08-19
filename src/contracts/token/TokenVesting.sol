@@ -30,10 +30,7 @@ contract TokenVesting is ReentrancyGuard {
 
     uint256 public released;
 
-    event TokensReleased(
-        address indexed beneficiary,
-        uint256 amount
-    );
+    event TokensReleased(address indexed beneficiary, uint256 amount);
 
     constructor(
         address _token,
@@ -63,108 +60,56 @@ contract TokenVesting is ReentrancyGuard {
             revert InvalidCliff();
         }
 
-        if (
-            _start >
-            type(uint256).max - _duration
-        ) {
+        if (_start > type(uint256).max - _duration) {
             revert TimestampOverflow();
         }
 
-        token =
-            IERC20(_token);
+        token = IERC20(_token);
 
-        beneficiary =
-            _beneficiary;
+        beneficiary = _beneficiary;
 
-        start =
-            _start;
+        start = _start;
 
-        cliff =
-            _start +
-            _cliffDuration;
+        cliff = _start + _cliffDuration;
 
-        duration =
-            _duration;
+        duration = _duration;
 
-        end =
-            _start +
-            _duration;
+        end = _start + _duration;
 
-        totalAmount =
-            _amount;
+        totalAmount = _amount;
     }
 
-    function release()
-        external
-        nonReentrant
-    {
-        if (
-            msg.sender !=
-            beneficiary
-        ) {
+    function release() external nonReentrant {
+        if (msg.sender != beneficiary) {
             revert NotBeneficiary();
         }
 
-        uint256 amount =
-            releasableAmount();
+        uint256 amount = releasableAmount();
 
         if (amount == 0) {
             revert NothingToRelease();
         }
 
-        released +=
-            amount;
+        released += amount;
 
-        token.safeTransfer(
-            beneficiary,
-            amount
-        );
+        token.safeTransfer(beneficiary, amount);
 
-        emit TokensReleased(
-            beneficiary,
-            amount
-        );
+        emit TokensReleased(beneficiary, amount);
     }
 
-    function releasableAmount()
-        public
-        view
-        returns (uint256)
-    {
-        return
-            vestedAmount(
-                block.timestamp
-            ) -
-            released;
+    function releasableAmount() public view returns (uint256) {
+        return vestedAmount(block.timestamp) - released;
     }
 
-    function vestedAmount(
-        uint256 timestamp
-    )
-        public
-        view
-        returns (uint256)
-    {
-        if (
-            timestamp <
-            cliff
-        ) {
+    function vestedAmount(uint256 timestamp) public view returns (uint256) {
+        if (timestamp < cliff) {
             return 0;
         }
 
-        if (
-            timestamp >=
-            end
-        ) {
+        if (timestamp >= end) {
             return totalAmount;
         }
 
-        return
-            totalAmount *
-            (
-                timestamp -
-                start
-            ) /
-            duration;
+        return totalAmount * (timestamp - start) / duration;
     }
 }

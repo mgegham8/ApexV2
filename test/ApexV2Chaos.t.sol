@@ -27,7 +27,7 @@ contract ApexV2ChaosTest is Test {
         token1.transfer(address(pair), 100_000 ether);
         pair.mint(address(this));
 
-        (initialReserve0, initialReserve1, ) = pair.getReserves();
+        (initialReserve0, initialReserve1,) = pair.getReserves();
         vm.deal(attacker, 100 ether);
     }
 
@@ -54,7 +54,7 @@ contract ApexV2ChaosTest is Test {
     }
 
     function testReserveInvariant() public {
-        (uint112 r0, uint112 r1, ) = pair.getReserves();
+        (uint112 r0, uint112 r1,) = pair.getReserves();
         assertGt(r0, 0);
         assertGt(r1, 0);
         assertLe(r0, initialReserve0 + 10_000 ether);
@@ -74,7 +74,7 @@ contract ApexV2ChaosTest is Test {
                 try pair.swap(0, 1 ether, attacker, "") {} catch {}
             }
         }
-        (uint112 r0, uint112 r1, ) = pair.getReserves();
+        (uint112 r0, uint112 r1,) = pair.getReserves();
         assertGt(r0, 0);
         assertGt(r1, 0);
     }

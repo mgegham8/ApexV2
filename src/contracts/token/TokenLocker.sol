@@ -27,28 +27,15 @@ contract TokenLocker is ReentrancyGuard {
 
     uint256 public nextLockId = 1;
 
-    mapping(uint256 => Lock)
-        public locks;
+    mapping(uint256 => Lock) public locks;
 
     event Locked(
-        uint256 indexed lockId,
-        address indexed token,
-        address indexed owner,
-        uint256 amount,
-        uint256 unlockTime
+        uint256 indexed lockId, address indexed token, address indexed owner, uint256 amount, uint256 unlockTime
     );
 
-    event Unlocked(
-        uint256 indexed lockId,
-        address indexed owner,
-        uint256 amount
-    );
+    event Unlocked(uint256 indexed lockId, address indexed owner, uint256 amount);
 
-    function lockTokens(
-        address token,
-        uint256 amount,
-        uint256 unlockTime
-    )
+    function lockTokens(address token, uint256 amount, uint256 unlockTime)
         external
         nonReentrant
         returns (uint256 lockId)
@@ -65,132 +52,63 @@ contract TokenLocker is ReentrancyGuard {
             revert InvalidUnlockTime();
         }
 
-        IERC20 tokenContract =
-            IERC20(token);
+        IERC20 tokenContract = IERC20(token);
 
-        uint256 balanceBefore =
-            tokenContract.balanceOf(
-                address(this)
-            );
+        uint256 balanceBefore = tokenContract.balanceOf(address(this));
 
-        tokenContract.safeTransferFrom(
-            msg.sender,
-            address(this),
-            amount
-        );
+        tokenContract.safeTransferFrom(msg.sender, address(this), amount);
 
-        uint256 balanceAfter =
-            tokenContract.balanceOf(
-                address(this)
-            );
+        uint256 balanceAfter = tokenContract.balanceOf(address(this));
 
-        uint256 received =
-            balanceAfter -
-            balanceBefore;
+        uint256 received = balanceAfter - balanceBefore;
 
         if (received == 0) {
             revert ZeroReceived();
         }
 
-        lockId =
-            nextLockId++;
+        lockId = nextLockId++;
 
         locks[lockId] =
-            Lock({
-                token: token,
-                owner: msg.sender,
-                amount: received,
-                unlockTime: unlockTime,
-                claimed: false
-            });
+            Lock({token: token, owner: msg.sender, amount: received, unlockTime: unlockTime, claimed: false});
 
-        emit Locked(
-            lockId,
-            token,
-            msg.sender,
-            received,
-            unlockTime
-        );
+        emit Locked(lockId, token, msg.sender, received, unlockTime);
     }
 
-    function unlock(
-        uint256 lockId
-    )
-        external
-        nonReentrant
-    {
-        Lock storage lockData =
-            locks[lockId];
+    function unlock(uint256 lockId) external nonReentrant {
+        Lock storage lockData = locks[lockId];
 
-        if (
-            lockData.owner ==
-            address(0)
-        ) {
+        if (lockData.owner == address(0)) {
             revert LockNotFound();
         }
 
-        if (
-            msg.sender !=
-            lockData.owner
-        ) {
+        if (msg.sender != lockData.owner) {
             revert NotLockOwner();
         }
 
-        if (
-            lockData.claimed
-        ) {
+        if (lockData.claimed) {
             revert AlreadyClaimed();
         }
 
-        if (
-            block.timestamp <
-            lockData.unlockTime
-        ) {
+        if (block.timestamp < lockData.unlockTime) {
             revert StillLocked();
         }
 
-        uint256 amount =
-            lockData.amount;
+        uint256 amount = lockData.amount;
 
-        lockData.claimed =
-            true;
+        lockData.claimed = true;
 
-        IERC20(
-            lockData.token
-        ).safeTransfer(
-            lockData.owner,
-            amount
-        );
+        IERC20(lockData.token).safeTransfer(lockData.owner, amount);
 
-        emit Unlocked(
-            lockId,
-            lockData.owner,
-            amount
-        );
+        emit Unlocked(lockId, lockData.owner, amount);
     }
 
-    function getLock(
-        uint256 lockId
-    )
+    function getLock(uint256 lockId)
         external
         view
-        returns (
-            address token,
-            address owner,
-            uint256 amount,
-            uint256 unlockTime,
-            bool claimed
-        )
+        returns (address token, address owner, uint256 amount, uint256 unlockTime, bool claimed)
     {
-        Lock memory lockData =
-            locks[lockId];
+        Lock memory lockData = locks[lockId];
 
-        return (
-            lockData.token,
-            lockData.owner,
-            lockData.amount,
-            lockData.unlockTime,
-            lockData.claimed
-        );
+        return (lockData.token, lockData.owner, lockData.amount, lockData.unlockTime, lockData.claimed);
     }
 }

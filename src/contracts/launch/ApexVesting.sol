@@ -49,33 +49,18 @@ contract ApexVesting is Ownable {
     // EVENTS
     // ============================================================
 
-    event OperatorUpdated(
-        address indexed operator,
-        bool status
-    );
+    event OperatorUpdated(address indexed operator, bool status);
 
-    event VestingCreated(
-        address indexed user,
-        uint256 amount,
-        uint256 startTime,
-        uint256 cliff,
-        uint256 duration
-    );
+    event VestingCreated(address indexed user, uint256 amount, uint256 startTime, uint256 cliff, uint256 duration);
 
-    event Claimed(
-        address indexed user,
-        uint256 amount
-    );
+    event Claimed(address indexed user, uint256 amount);
 
     // ============================================================
     // MODIFIERS
     // ============================================================
 
     modifier onlyOperator() {
-        if (
-            msg.sender != owner() &&
-            !operators[msg.sender]
-        ) {
+        if (msg.sender != owner() && !operators[msg.sender]) {
             revert NotOperator();
         }
 
@@ -86,54 +71,33 @@ contract ApexVesting is Ownable {
     // CONSTRUCTOR
     // ============================================================
 
-    constructor(
-        address _token
-    )
-        Ownable(msg.sender)
-    {
+    constructor(address _token) Ownable(msg.sender) {
         if (_token == address(0)) {
             revert ZeroToken();
         }
 
-        token =
-            IERC20(_token);
+        token = IERC20(_token);
     }
 
     // ============================================================
     // OPERATOR MANAGEMENT
     // ============================================================
 
-    function setOperator(
-        address operator,
-        bool status
-    )
-        external
-        onlyOwner
-    {
+    function setOperator(address operator, bool status) external onlyOwner {
         if (operator == address(0)) {
             revert ZeroOperator();
         }
 
-        operators[operator] =
-            status;
+        operators[operator] = status;
 
-        emit OperatorUpdated(
-            operator,
-            status
-        );
+        emit OperatorUpdated(operator, status);
     }
 
     // ============================================================
     // CREATE VESTING
     // ============================================================
 
-    function createVesting(
-        address user,
-        uint256 amount,
-        uint256 startTime,
-        uint256 cliff,
-        uint256 duration
-    )
+    function createVesting(address user, uint256 amount, uint256 startTime, uint256 cliff, uint256 duration)
         external
         onlyOperator
     {
@@ -157,87 +121,51 @@ contract ApexVesting is Ownable {
          * duration >= cliff, therefore validating the larger
          * startTime + duration addition protects both timestamps.
          */
-        if (
-            startTime >
-            type(uint256).max - duration
-        ) {
+        if (startTime > type(uint256).max - duration) {
             revert InvalidStartTime();
         }
 
-        if (
-            schedules[user].totalAmount != 0
-        ) {
+        if (schedules[user].totalAmount != 0) {
             revert VestingAlreadyExists();
         }
 
-        uint256 newTotalUnclaimed =
-            totalUnclaimed +
-            amount;
+        uint256 newTotalUnclaimed = totalUnclaimed + amount;
 
-        if (
-            token.balanceOf(address(this)) <
-            newTotalUnclaimed
-        ) {
+        if (token.balanceOf(address(this)) < newTotalUnclaimed) {
             revert InsufficientFunding();
         }
 
         schedules[user] =
-            Schedule({
-                totalAmount: amount,
-                claimed: 0,
-                startTime: startTime,
-                cliff: cliff,
-                duration: duration
-            });
+            Schedule({totalAmount: amount, claimed: 0, startTime: startTime, cliff: cliff, duration: duration});
 
-        totalUnclaimed =
-            newTotalUnclaimed;
+        totalUnclaimed = newTotalUnclaimed;
 
-        emit VestingCreated(
-            user,
-            amount,
-            startTime,
-            cliff,
-            duration
-        );
+        emit VestingCreated(user, amount, startTime, cliff, duration);
     }
 
     // ============================================================
     // CLAIM
     // ============================================================
 
-    function claim()
-        external
-    {
-        Schedule storage schedule =
-            schedules[msg.sender];
+    function claim() external {
+        Schedule storage schedule = schedules[msg.sender];
 
-        if (
-            schedule.totalAmount == 0
-        ) {
+        if (schedule.totalAmount == 0) {
             revert NoVesting();
         }
 
-        uint256 vested =
-            _vestedAmount(
-                schedule
-            );
+        uint256 vested = _vestedAmount(schedule);
 
-        uint256 previouslyClaimed =
-            schedule.claimed;
+        uint256 previouslyClaimed = schedule.claimed;
 
-        if (
-            vested <= previouslyClaimed
-        ) {
+        if (vested <= previouslyClaimed) {
             revert NothingToClaim();
         }
 
         uint256 amount;
 
         unchecked {
-            amount =
-                vested -
-                previouslyClaimed;
+            amount = vested - previouslyClaimed;
         }
 
         /*
@@ -247,61 +175,36 @@ contract ApexVesting is Ownable {
          * claimed stores the cumulative vested amount already paid,
          * not the amount of only the latest claim.
          */
-        schedule.claimed =
-            vested;
+        schedule.claimed = vested;
 
-        totalUnclaimed -=
-            amount;
+        totalUnclaimed -= amount;
 
-        token.safeTransfer(
-            msg.sender,
-            amount
-        );
+        token.safeTransfer(msg.sender, amount);
 
-        emit Claimed(
-            msg.sender,
-            amount
-        );
+        emit Claimed(msg.sender, amount);
     }
 
     // ============================================================
     // CLAIMABLE
     // ============================================================
 
-    function claimable(
-        address user
-    )
-        public
-        view
-        returns (uint256)
-    {
-        Schedule storage schedule =
-            schedules[user];
+    function claimable(address user) public view returns (uint256) {
+        Schedule storage schedule = schedules[user];
 
-        if (
-            schedule.totalAmount == 0
-        ) {
+        if (schedule.totalAmount == 0) {
             return 0;
         }
 
-        uint256 vested =
-            _vestedAmount(
-                schedule
-            );
+        uint256 vested = _vestedAmount(schedule);
 
-        uint256 previouslyClaimed =
-            schedule.claimed;
+        uint256 previouslyClaimed = schedule.claimed;
 
-        if (
-            vested <= previouslyClaimed
-        ) {
+        if (vested <= previouslyClaimed) {
             return 0;
         }
 
         unchecked {
-            return
-                vested -
-                previouslyClaimed;
+            return vested - previouslyClaimed;
         }
     }
 
@@ -309,87 +212,50 @@ contract ApexVesting is Ownable {
     // VESTED AMOUNT
     // ============================================================
 
-    function vestedAmount(
-        address user
-    )
-        external
-        view
-        returns (uint256)
-    {
-        Schedule storage schedule =
-            schedules[user];
+    function vestedAmount(address user) external view returns (uint256) {
+        Schedule storage schedule = schedules[user];
 
-        if (
-            schedule.totalAmount == 0
-        ) {
+        if (schedule.totalAmount == 0) {
             return 0;
         }
 
-        return
-            _vestedAmount(
-                schedule
-            );
+        return _vestedAmount(schedule);
     }
 
     // ============================================================
     // GET SCHEDULE
     // ============================================================
 
-    function getSchedule(
-        address user
-    )
-        external
-        view
-        returns (Schedule memory)
-    {
-        return
-            schedules[user];
+    function getSchedule(address user) external view returns (Schedule memory) {
+        return schedules[user];
     }
 
     // ============================================================
     // INTERNAL VESTING CALCULATION
     // ============================================================
 
-    function _vestedAmount(
-        Schedule storage schedule
-    )
-        private
-        view
-        returns (uint256)
-    {
-        uint256 timestamp =
-            block.timestamp;
+    function _vestedAmount(Schedule storage schedule) private view returns (uint256) {
+        uint256 timestamp = block.timestamp;
 
-        uint256 startTime =
-            schedule.startTime;
+        uint256 startTime = schedule.startTime;
 
-        uint256 cliffTime =
-            startTime +
-            schedule.cliff;
+        uint256 cliffTime = startTime + schedule.cliff;
 
         /*
          * Before the cliff absolutely nothing is vested.
          */
-        if (
-            timestamp <
-            cliffTime
-        ) {
+        if (timestamp < cliffTime) {
             return 0;
         }
 
-        uint256 endTime =
-            startTime +
-            schedule.duration;
+        uint256 endTime = startTime + schedule.duration;
 
         /*
          * At or after the exact end timestamp the complete
          * allocation is vested.
          */
-        if (
-            timestamp >= endTime
-        ) {
-            return
-                schedule.totalAmount;
+        if (timestamp >= endTime) {
+            return schedule.totalAmount;
         }
 
         /*
@@ -399,16 +265,9 @@ contract ApexVesting is Ownable {
         uint256 elapsed;
 
         unchecked {
-            elapsed =
-                timestamp -
-                startTime;
+            elapsed = timestamp - startTime;
         }
 
-        return
-            (
-                schedule.totalAmount *
-                elapsed
-            ) /
-            schedule.duration;
+        return (schedule.totalAmount * elapsed) / schedule.duration;
     }
 }

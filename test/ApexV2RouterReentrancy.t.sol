@@ -102,16 +102,7 @@ contract ApexV2RouterReentrancyTest is Test {
         reentrantToken.approve(address(router), type(uint256).max);
         token1.approve(address(router), type(uint256).max);
 
-        router.addLiquidity(
-            t0,
-            t1,
-            10000 ether,
-            10000 ether,
-            0,
-            0,
-            address(this),
-            block.timestamp
-        );
+        router.addLiquidity(t0, t1, 10000 ether, 10000 ether, 0, 0, address(this), block.timestamp);
 
         attacker = new ReentrantAttacker(router, address(pair), t0, t1);
         reentrantToken.setAttacker(address(attacker));
@@ -139,12 +130,7 @@ contract ReentrantAttacker is IReentrantAttacker {
     address public token0;
     address public token1;
 
-    constructor(
-        ApexV2Router _router,
-        address _pair,
-        address _token0,
-        address _token1
-    ) {
+    constructor(ApexV2Router _router, address _pair, address _token0, address _token1) {
         router = _router;
         pair = ApexV2Pair(_pair);
         token0 = _token0;
@@ -155,15 +141,7 @@ contract ReentrantAttacker is IReentrantAttacker {
         uint256 liquidity = pair.balanceOf(address(this));
         pair.approve(address(router), liquidity);
 
-        router.removeLiquidity(
-            token0,
-            token1,
-            liquidity,
-            0,
-            0,
-            address(this),
-            block.timestamp
-        );
+        router.removeLiquidity(token0, token1, liquidity, 0, 0, address(this), block.timestamp);
     }
 
     function callback() external override {
@@ -172,12 +150,6 @@ contract ReentrantAttacker is IReentrantAttacker {
         path[1] = token1;
 
         // Attempting malicious re-entrant call back into the router/pair
-        router.swapExactTokensForTokens(
-            1e18,
-            0,
-            path,
-            address(this),
-            block.timestamp
-        );
+        router.swapExactTokensForTokens(1e18, 0, path, address(this), block.timestamp);
     }
 }

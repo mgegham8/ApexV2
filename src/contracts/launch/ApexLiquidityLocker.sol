@@ -38,14 +38,9 @@ contract ApexLiquidityLocker {
     // EVENTS
     // ============================================================
 
-    event LiquidityLocked(
-        uint256 amount,
-        uint256 unlockTime
-    );
+    event LiquidityLocked(uint256 amount, uint256 unlockTime);
 
-    event LiquidityWithdrawn(
-        uint256 amount
-    );
+    event LiquidityWithdrawn(uint256 amount);
 
     // ============================================================
     // MODIFIERS
@@ -63,9 +58,7 @@ contract ApexLiquidityLocker {
     // CONSTRUCTOR
     // ============================================================
 
-    constructor(
-        address _lpToken
-    ) {
+    constructor(address _lpToken) {
         if (_lpToken == address(0)) {
             revert ZeroLPToken();
         }
@@ -74,24 +67,16 @@ contract ApexLiquidityLocker {
             revert TokenHasNoCode();
         }
 
-        owner =
-            msg.sender;
+        owner = msg.sender;
 
-        lpToken =
-            IERC20(_lpToken);
+        lpToken = IERC20(_lpToken);
     }
 
     // ============================================================
     // LOCK
     // ============================================================
 
-    function lock(
-        uint256 amount,
-        uint256 _unlockTime
-    )
-        external
-        onlyOwner
-    {
+    function lock(uint256 amount, uint256 _unlockTime) external onlyOwner {
         if (locked) {
             revert AlreadyLocked();
         }
@@ -100,10 +85,7 @@ contract ApexLiquidityLocker {
             revert ZeroAmount();
         }
 
-        if (
-            _unlockTime <=
-            block.timestamp
-        ) {
+        if (_unlockTime <= block.timestamp) {
             revert InvalidUnlockTime();
         }
 
@@ -116,91 +98,55 @@ contract ApexLiquidityLocker {
          *
          * and reverts on failed / false transfers.
          */
-        lpToken.safeTransferFrom(
-            msg.sender,
-            address(this),
-            amount
-        );
+        lpToken.safeTransferFrom(msg.sender, address(this), amount);
 
-        lockedAmount =
-            amount;
+        lockedAmount = amount;
 
-        unlockTime =
-            _unlockTime;
+        unlockTime = _unlockTime;
 
-        locked =
-            true;
+        locked = true;
 
-        emit LiquidityLocked(
-            amount,
-            _unlockTime
-        );
+        emit LiquidityLocked(amount, _unlockTime);
     }
 
     // ============================================================
     // WITHDRAW
     // ============================================================
 
-    function withdraw()
-        external
-        onlyOwner
-    {
+    function withdraw() external onlyOwner {
         if (!locked) {
             revert NotLocked();
         }
 
-        if (
-            block.timestamp <
-            unlockTime
-        ) {
+        if (block.timestamp < unlockTime) {
             revert NotUnlocked();
         }
 
-        uint256 amount =
-            lockedAmount;
+        uint256 amount = lockedAmount;
 
         /*
          * Effects before interaction.
          */
-        lockedAmount =
-            0;
+        lockedAmount = 0;
 
-        unlockTime =
-            0;
+        unlockTime = 0;
 
-        locked =
-            false;
+        locked = false;
 
-        lpToken.safeTransfer(
-            owner,
-            amount
-        );
+        lpToken.safeTransfer(owner, amount);
 
-        emit LiquidityWithdrawn(
-            amount
-        );
+        emit LiquidityWithdrawn(amount);
     }
 
     // ============================================================
     // VIEWS
     // ============================================================
 
-    function getLockedAmount()
-        external
-        view
-        returns (uint256)
-    {
+    function getLockedAmount() external view returns (uint256) {
         return lockedAmount;
     }
 
-    function isUnlocked()
-        external
-        view
-        returns (bool)
-    {
-        return
-            locked &&
-            block.timestamp >=
-            unlockTime;
+    function isUnlocked() external view returns (bool) {
+        return locked && block.timestamp >= unlockTime;
     }
 }

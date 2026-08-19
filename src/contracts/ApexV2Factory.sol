@@ -34,36 +34,20 @@ contract ApexV2Factory {
     /// @param token1 Higher-address token.
     /// @param pair Newly deployed pair.
     /// @param pairCount Total number of pairs after creation.
-    event PairCreated(
-        address indexed token0,
-        address indexed token1,
-        address pair,
-        uint256 pairCount
-    );
+    event PairCreated(address indexed token0, address indexed token1, address pair, uint256 pairCount);
 
     /// @notice Emitted when the protocol fee recipient changes.
-    event FeeToUpdated(
-        address indexed previousFeeTo,
-        address indexed newFeeTo
-    );
+    event FeeToUpdated(address indexed previousFeeTo, address indexed newFeeTo);
 
     /// @notice Emitted when the fee configuration administrator changes.
-    event FeeToSetterUpdated(
-        address indexed previousFeeToSetter,
-        address indexed newFeeToSetter
-    );
+    event FeeToSetterUpdated(address indexed previousFeeToSetter, address indexed newFeeToSetter);
 
     // ============================================================
     // CONSTRUCTOR
     // ============================================================
 
-    constructor(
-        address _feeToSetter
-    ) {
-        require(
-            _feeToSetter != address(0),
-            "ZERO_SETTER"
-        );
+    constructor(address _feeToSetter) {
+        require(_feeToSetter != address(0), "ZERO_SETTER");
 
         feeToSetter = _feeToSetter;
     }
@@ -73,11 +57,7 @@ contract ApexV2Factory {
     // ============================================================
 
     /// @notice Returns the total number of pairs created.
-    function allPairsLength()
-        external
-        view
-        returns (uint256)
-    {
+    function allPairsLength() external view returns (uint256) {
         return allPairs.length;
     }
 
@@ -87,57 +67,27 @@ contract ApexV2Factory {
 
     /// @notice Creates a trading pair between tokenA and tokenB.
     /// @dev The same pair cannot be created twice regardless of token ordering.
-    function createPair(
-        address tokenA,
-        address tokenB
-    )
-        external
-        returns (address pair)
-    {
-        require(
-            tokenA != tokenB,
-            "IDENTICAL_ADDRESSES"
-        );
+    function createPair(address tokenA, address tokenB) external returns (address pair) {
+        require(tokenA != tokenB, "IDENTICAL_ADDRESSES");
 
-        require(
-            tokenA != address(0) &&
-                tokenB != address(0),
-            "ZERO_ADDRESS"
-        );
+        require(tokenA != address(0) && tokenB != address(0), "ZERO_ADDRESS");
 
-        (
-            address token0,
-            address token1
-        ) = tokenA < tokenB
-            ? (tokenA, tokenB)
-            : (tokenB, tokenA);
+        (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
 
-        require(
-            getPair[token0][token1] == address(0),
-            "PAIR_EXISTS"
-        );
+        require(getPair[token0][token1] == address(0), "PAIR_EXISTS");
 
-        ApexV2Pair newPair =
-            new ApexV2Pair();
+        ApexV2Pair newPair = new ApexV2Pair();
 
         pair = address(newPair);
 
-        newPair.initialize(
-            token0,
-            token1
-        );
+        newPair.initialize(token0, token1);
 
         getPair[token0][token1] = pair;
         getPair[token1][token0] = pair;
 
         allPairs.push(pair);
 
-        emit PairCreated(
-            token0,
-            token1,
-            pair,
-            allPairs.length
-        );
+        emit PairCreated(token0, token1, pair, allPairs.length);
     }
 
     // ============================================================
@@ -146,18 +96,10 @@ contract ApexV2Factory {
 
     /// @notice Updates the protocol fee recipient.
     /// @dev Setting feeTo to address(0) intentionally disables protocol fees.
-    function setFeeTo(
-        address _feeTo
-    )
-        external
-    {
-        require(
-            msg.sender == feeToSetter,
-            "FORBIDDEN"
-        );
+    function setFeeTo(address _feeTo) external {
+        require(msg.sender == feeToSetter, "FORBIDDEN");
 
-        address previousFeeTo =
-            feeTo;
+        address previousFeeTo = feeTo;
 
         // Avoid unnecessary storage writes and misleading events.
         if (_feeTo == previousFeeTo) {
@@ -166,10 +108,7 @@ contract ApexV2Factory {
 
         feeTo = _feeTo;
 
-        emit FeeToUpdated(
-            previousFeeTo,
-            _feeTo
-        );
+        emit FeeToUpdated(previousFeeTo, _feeTo);
     }
 
     // ============================================================
@@ -178,36 +117,19 @@ contract ApexV2Factory {
 
     /// @notice Transfers fee configuration authority to a new setter.
     /// @dev Zero-address setter is forbidden to prevent accidental permanent lockout.
-    function setFeeToSetter(
-        address _setter
-    )
-        external
-    {
-        require(
-            msg.sender == feeToSetter,
-            "FORBIDDEN"
-        );
+    function setFeeToSetter(address _setter) external {
+        require(msg.sender == feeToSetter, "FORBIDDEN");
 
-        require(
-            _setter != address(0),
-            "ZERO_SETTER"
-        );
+        require(_setter != address(0), "ZERO_SETTER");
 
-        address previousSetter =
-            feeToSetter;
+        address previousSetter = feeToSetter;
 
         // No-op transitions are rejected because they provide no useful
         // state change and usually indicate configuration error.
-        require(
-            _setter != previousSetter,
-            "SAME_SETTER"
-        );
+        require(_setter != previousSetter, "SAME_SETTER");
 
         feeToSetter = _setter;
 
-        emit FeeToSetterUpdated(
-            previousSetter,
-            _setter
-        );
+        emit FeeToSetterUpdated(previousSetter, _setter);
     }
 }

@@ -17,9 +17,9 @@ contract ApexV2RouterLiquidityEdgeCasesTest is Test {
 
     function setUp() public {
         factory = new ApexV2Factory(address(this));
-        
+
         weth = new MockERC20("Wrapped Ether", "WETH");
-        router = new ApexV2Router(address(factory), address(weth)); 
+        router = new ApexV2Router(address(factory), address(weth));
 
         tokenA = new MockERC20("Token A", "TKNA");
         tokenB = new MockERC20("Token B", "TKNB");
@@ -38,51 +38,25 @@ contract ApexV2RouterLiquidityEdgeCasesTest is Test {
     function test_RevertWhen_AddLiquidity_ExpiredDeadline() public {
         vm.startPrank(user);
         vm.warp(1000);
-        
-        vm.expectRevert(); 
-        router.addLiquidity(
-            address(tokenA),
-            address(tokenB),
-            100e18,
-            100e18,
-            1,
-            1,
-            user,
-            999 
-        );
+
+        vm.expectRevert();
+        router.addLiquidity(address(tokenA), address(tokenB), 100e18, 100e18, 1, 1, user, 999);
         vm.stopPrank();
     }
 
     function test_RevertWhen_AddLiquidity_ZeroAmounts() public {
         vm.startPrank(user);
-        vm.expectRevert(); 
-        router.addLiquidity(
-            address(tokenA),
-            address(tokenB),
-            0,
-            0,
-            0,
-            0,
-            user,
-            block.timestamp + 100
-        );
+        vm.expectRevert();
+        router.addLiquidity(address(tokenA), address(tokenB), 0, 0, 0, 0, user, block.timestamp + 100);
         vm.stopPrank();
     }
 
     function test_RevertWhen_RemoveLiquidity_ExpiredDeadline() public {
         vm.startPrank(user);
         vm.warp(1000);
-        
-        vm.expectRevert(); 
-        router.removeLiquidity(
-            address(tokenA),
-            address(tokenB),
-            100,
-            1,
-            1,
-            user,
-            999
-        );
+
+        vm.expectRevert();
+        router.removeLiquidity(address(tokenA), address(tokenB), 100, 1, 1, user, 999);
         vm.stopPrank();
     }
 }
